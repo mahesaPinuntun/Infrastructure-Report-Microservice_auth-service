@@ -1,22 +1,64 @@
 const mongoose = require('mongoose');
 
+// 1. User Schema
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  role: { 
-    type: String, 
-    enum: ['CITIZEN', 'TECHNICIAN', 'MANAGER', 'ADMIN'], 
-    default: 'CITIZEN' 
-  },
-  phone: { type: String },
-  avatar: { type: String },
+  passwordHash: { type: String, required: true },
+  role: { type: String, default: 'USER' },
+  status: { type: String, enum: ['PENDING', 'ACTIVE'], default: 'PENDING' },
+  phoneNumber: String,
+  verificationToken: String,
+  tokenExpiresAt: Date,
   createdAt: { type: Date, default: Date.now }
 });
 
-// Pastikan meng-export object yang berisi User
+// 2. Admin Schema
+const adminSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true },
+  role: { type: String, default: 'ADMIN' },
+  status: { type: String, enum: ['PENDING', 'ACTIVE'], default: 'ACTIVE' },
+  verificationToken: String,
+  tokenExpiresAt: Date,
+  createdAt: { type: Date, default: Date.now }
+});
+
+// 3. Infrastructure Manager Schema
+const managerSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true },
+  department: String,
+  role: { type: String, default: 'INFRASTRUCTURE_MANAGER' },
+  status: { type: String, enum: ['PENDING', 'ACTIVE'], default: 'PENDING' },
+  verificationToken: String,
+  tokenExpiresAt: Date,
+  createdAt: { type: Date, default: Date.now }
+});
+
+// 4. Technician Schema
+const technicianSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true },
+  specialization: String,
+  role: { type: String, default: 'TECHNICIAN' },
+  status: { type: String, enum: ['PENDING', 'ACTIVE'], default: 'PENDING' },
+  verificationToken: String,
+  tokenExpiresAt: Date,
+  createdAt: { type: Date, default: Date.now }
+});
+
 const User = mongoose.models.User || mongoose.model('User', userSchema, 'users');
+const Admin = mongoose.models.Admin || mongoose.model('Admin', adminSchema, 'admins');
+const InfrastructureManager = mongoose.models.InfrastructureManager || mongoose.model('InfrastructureManager', managerSchema, 'infrastructure_managers');
+const Technician = mongoose.models.Technician || mongoose.model('Technician', technicianSchema, 'technicians');
 
 module.exports = {
-  User
+  User,
+  Admin,
+  InfrastructureManager,
+  Technician
 };

@@ -1,57 +1,48 @@
-const sendVerificationEmail = async (email, name, token) => {
-  const verifyLink = `${process.env.CLIENT_VERIFY_URL}?token=${token}`;
+const axios = require('axios');
 
-  const payload = {
-    sender: {
-      name: process.env.SENDER_NAME || "Sistem Laporan Infrastruktur",
-      email: process.env.SENDER_EMAIL || "mapupi.ganteng@gmail.com"
-    },
-    to: [
-      {
-        email: email,
-        name: name
-      }
-    ],
-    subject: "Verifikasi Akun Sistem Laporan Infrastruktur",
-    htmlContent: `
-      <html>
-        <head></head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          <h2>Halo, ${name}!</h2>
-          <p>Terima kasih telah mendaftar di Sistem Laporan Infrastruktur.</p>
-          <p>Silakan verifikasi akun Anda dengan menekan tombol di bawah ini:</p>
-          <p>
-            <a href="${verifyLink}" style="padding: 12px 24px; background-color: #007bff; color: #ffffff; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Verifikasi Akun Saya</a>
-          </p>
-          <p>Atau salin link berikut ke browser Anda:</p>
-          <p><a href="${verifyLink}">${verifyLink}</a></p>
-          <br>
-          <p><small>Link ini berlaku selama 24 jam.</small></p>
-        </body>
-      </html>
-    `
-  };
+const sendVerificationEmail = async (toEmail, toName, verificationToken) => {
+  // Pastikan API Key ada
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    throw new Error("BREVO_API_KEY is missing in environment variables.");
+  }
+
+  const verificationUrl = `${process.env.BASE_URL || 'https://infrastructure-report-microservice-auth.vercel.app'}/api/auth/verify?token=${verificationToken}`;
 
   try {
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'accept': 'application/json',
-        'api-key': process.env.BREVO_API_KEY,
-        'content-type': 'application/json'
+    const response = await axios.post(
+      'https://api.brevo.com/v3/smtp/email',
+      {
+        sender: {
+          name: "Infrastructure Report System",
+          email: process.env.SENDER_EMAIL || toEmail // Fallback untuk testing
+        },
+        to: [
+          {
+            email: toEmail,
+            name: toName
+          }
+        ],
+        subject: "Verifikasi Akun - Infrastructure Report System",
+        htmlContent: `
+          <h3>Halo ${toName},</h3>
+          <p>Terima kasih telah mendaftar. Silakan klik tombol di bawah untuk memverifikasi akun Anda:</p>
+          <a href="${verificationUrl}" style="padding: 10px 18px; background-color: #0070f3; color: white; text-decoration: none; border-radius: 5px; display: inline-block;">Verifikasi Akun</a>
+        `
       },
-      body: JSON.stringify(payload)
-    });
+      {
+        headers: {
+          'api-key': apiKey.trim(), // ✅ Header wajib Brevo v3
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      }
+    );
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('Brevo API Error Response:', data);
-    } else {
-      console.log(`Verification email successfully sent to ${email}. Message ID:`, data.messageId);
-    }
+    return response.data;
   } catch (error) {
-    console.error('Failed to send verification email via Brevo REST API:', error.message);
+    console.error('[auth-service] Brevo Error Detail:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Gagal mengirim email verifikasi');
   }
 };
 

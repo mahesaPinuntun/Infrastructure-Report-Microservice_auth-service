@@ -27,7 +27,7 @@ connectDB();
 
 // Apply Rate Limiter specifically to login & register endpoints
 
-app.post('/', (req, res)) => {
+app.get('/', (req, res)) => {
   res.json({message:"auth-service is running" , port: process.env.PORT || 8001 });
 });
 app.post('/api/auth/register', authLimiter, authController.register);

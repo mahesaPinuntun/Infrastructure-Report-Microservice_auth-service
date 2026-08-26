@@ -26,6 +26,8 @@ app.use(express.json());
 connectDB();
 
 // Apply Rate Limiter specifically to login & register endpoints
+
+app.post('/', authLimiter, (req, res)){res.json({message:"auth-service is running"})};
 app.post('/api/auth/register', authLimiter, authController.register);
 app.post('/api/auth/login', authLimiter, authController.login);
 app.get('/api/auth/verify', authController.verifyAccount);

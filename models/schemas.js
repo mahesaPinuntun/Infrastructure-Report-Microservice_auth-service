@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 
-// User Schema
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
@@ -15,6 +14,7 @@ const userSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+// Pastikan meng-export object yang berisi User
 const User = mongoose.models.User || mongoose.model('User', userSchema, 'users');
 
 module.exports = {

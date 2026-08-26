@@ -1,20 +1,19 @@
-const express = require('express');
-const connectDB = require('../config/db');
-const authRoutes = require('../routes/authRoutes'); // sesuaikan dengan file route kamu
+const mongoose = require('mongoose');
 
-const app = express();
-app.use(express.json());
-
-// ✅ Wajib: Await koneksi MongoDB pada setiap request serverless
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    res.status(500).json({ error: "Database connection failed: " + err.message });
+const connectDB = async () => {
+  // 1. Jika sudah terhubung, langsung reuse koneksi yang ada
+  if (mongoose.connection.readyState >= 1) {
+    return;
   }
-});
 
-app.use('/api/auth', authRoutes);
+  // 2. Hubungkan ke MongoDB Atlas
+  await mongoose.connect(process.env.MONGO_URI, {
+    tls: true,
+    serverSelectionTimeoutMS: 5000,
+    bufferCommands: false // Matikan buffering agar jika db mati langsung error, bukan menggantung
+  });
 
-module.exports = app;
+  console.log('[auth-service] Connected to MongoDB Atlas');
+};
+
+module.exports = connectDB;

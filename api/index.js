@@ -41,9 +41,25 @@ app.get('/api/auth/health', (req, res) => {
   res.json({ status: "Auth Service Active" });
 });
 
-// Auth Endpoints
-app.post('/api/auth/register', authLimiter, authController.register);
-app.post('/api/auth/login', authLimiter, authController.login);
+// ----------------------------------------------------
+// Dedicated Registration Endpoints Per Role
+// ----------------------------------------------------
+app.post('/api/auth/register/user', authLimiter, authController.registerUser);
+app.post('/api/auth/register/admin', authLimiter, authController.registerAdmin);
+app.post('/api/auth/register/manager', authLimiter, authController.registerManager);
+app.post('/api/auth/register/technician', authLimiter, authController.registerTechnician);
+
+// ----------------------------------------------------
+// Dedicated Login Endpoints Per Role
+// ----------------------------------------------------
+app.post('/api/auth/login/user', authLimiter, authController.loginUser);
+app.post('/api/auth/login/admin', authLimiter, authController.loginAdmin);
+app.post('/api/auth/login/manager', authLimiter, authController.loginManager);
+app.post('/api/auth/login/technician', authLimiter, authController.loginTechnician);
+
+// ----------------------------------------------------
+// Account Verification Endpoint
+// ----------------------------------------------------
 app.get('/api/auth/verify', authController.verifyAccount);
 
 // Global Error Handler (Prevents Function Crash)

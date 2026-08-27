@@ -1,7 +1,6 @@
 const axios = require('axios');
 
 const sendVerificationEmail = async (toEmail, toName, verificationToken) => {
-  // Pastikan API Key ada
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
     throw new Error("BREVO_API_KEY is missing in environment variables.");
@@ -14,25 +13,20 @@ const sendVerificationEmail = async (toEmail, toName, verificationToken) => {
       'https://api.brevo.com/v3/smtp/email',
       {
         sender: {
-          name: "Infrastructure Report System",
-          email: process.env.SENDER_EMAIL || toEmail // Fallback untuk testing
+          name: process.env.SENDER_NAME || "Infrastructure Report System",
+          email: process.env.SENDER_EMAIL
         },
-        to: [
-          {
-            email: toEmail,
-            name: toName
-          }
-        ],
+        to: [{ email: toEmail, name: toName }],
         subject: "Verifikasi Akun - Infrastructure Report System",
         htmlContent: `
           <h3>Halo ${toName},</h3>
-          <p>Terima kasih telah mendaftar. Silakan klik tombol di bawah untuk memverifikasi akun Anda:</p>
+          <p>Silakan klik tombol di bawah untuk memverifikasi akun Anda:</p>
           <a href="${verificationUrl}" style="padding: 10px 18px; background-color: #0070f3; color: white; text-decoration: none; border-radius: 5px; display: inline-block;">Verifikasi Akun</a>
         `
       },
       {
         headers: {
-          'api-key': apiKey.trim(), // ✅ Header wajib Brevo v3
+          'api-key': apiKey.trim(), // ✅ Wajib 'api-key' tanpa spasi ekstra
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         }

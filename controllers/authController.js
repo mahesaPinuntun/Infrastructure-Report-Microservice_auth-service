@@ -1,10 +1,10 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { Admin, InfrastructureManager, Technician, User } = require('../models/schemas'); //watch this later
+const { Admin, InfrastructureManager, Technician, User } = require('../models/schemas');
 const sendVerificationEmail = require('../utils/emailer');
 
-// Helper untuk memilih Model berdasarkan Role
+// Helper untuk memilih Model & Collection berdasarkan Role
 const getModelByRole = (role) => {
   switch (role) {
     case 'ADMIN': return { model: Admin, collectionName: 'admins' };
@@ -15,55 +15,122 @@ const getModelByRole = (role) => {
   }
 };
 
-// 1. Register User / Entity
-exports.register = async (req, res) => {
-  try {
-    const { name, email, password, role = 'USER', phoneNumber, department, specialization } = req.body;
+// Helper Internal untuk Eksekusi Registrasi (Prevent Code Duplication)
+const executeRegistration = async (res, TargetModel, userData, email, name) => {
+  const existingUser = await TargetModel.findOne({ email });
+  if (existingUser) {
+    return res.status(400).json({ error: "Email already registered." });
+  }
 
-    // Parameterize & Validate Input (#13, #14)
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash(userData.password, salt);
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Hours
+
+  const newUser = new TargetModel({
+    ...userData,
+    passwordHash,
+    verificationToken,
+    tokenExpiresAt
+  });
+
+  await newUser.save();
+  await sendVerificationEmail(email, name, verificationToken);
+
+  return res.status(201).json({
+    message: "Registration successful. Please check your email to verify your account."
+  });
+};
+
+// ----------------------------------------------------
+// 1. REGISTRATION ENDPOINTS PER ROLE
+// ----------------------------------------------------
+
+// Register Warga / Standard User
+exports.registerUser = async (req, res) => {
+  try {
+    const { name, email, password, phoneNumber } = req.body;
     if (!name || !email || !password) {
       return res.status(400).json({ error: "Name, email, and password are required." });
     }
 
-    const target = getModelByRole(role);
-    if (!target) return res.status(400).json({ error: "Invalid role specified." });
-
-    const existingUser = await target.model.findOne({ email });
-    if (existingUser) return res.status(400).json({ error: "Email already registered." });
-
-    // Hash Password (#10)
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
-
-    // Generate Verification Token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-    const newUser = new target.model({
+    await executeRegistration(res, User, {
       name,
       email,
-      passwordHash,
-      verificationToken,
-      tokenExpiresAt,
-      ...(phoneNumber && { phoneNumber }),
-      ...(department && { department }),
-      ...(specialization && { specialization })
-    });
-
-    await newUser.save();
-
-    // Kirim Email via Brevo
-    await sendVerificationEmail(email, name, verificationToken);
-
-    res.status(201).json({
-      message: "Registration successful. Please check your email to verify your account."
-    });
+      password,
+      role: 'USER',
+      ...(phoneNumber && { phoneNumber })
+    }, email, name);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// 2. Account Email Verification
+// Register System Admin
+exports.registerAdmin = async (req, res) => {
+  try {
+    const { name, email, password, phoneNumber } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "Name, email, and password are required." });
+    }
+
+    await executeRegistration(res, Admin, {
+      name,
+      email,
+      password,
+      role: 'ADMIN',
+      ...(phoneNumber && { phoneNumber })
+    }, email, name);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Register Infrastructure Manager
+exports.registerManager = async (req, res) => {
+  try {
+    const { name, email, password, phoneNumber, department } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "Name, email, and password are required." });
+    }
+
+    await executeRegistration(res, InfrastructureManager, {
+      name,
+      email,
+      password,
+      role: 'INFRASTRUCTURE_MANAGER',
+      ...(phoneNumber && { phoneNumber }),
+      ...(department && { department })
+    }, email, name);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Register Technician
+exports.registerTechnician = async (req, res) => {
+  try {
+    const { name, email, password, phoneNumber, specialization } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "Name, email, and password are required." });
+    }
+
+    await executeRegistration(res, Technician, {
+      name,
+      email,
+      password,
+      role: 'TECHNICIAN',
+      ...(phoneNumber && { phoneNumber }),
+      ...(specialization && { specialization })
+    }, email, name);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ----------------------------------------------------
+// 2. ACCOUNT EMAIL VERIFICATION
+// ----------------------------------------------------
 exports.verifyAccount = async (req, res) => {
   try {
     const { token } = req.query;
@@ -95,7 +162,9 @@ exports.verifyAccount = async (req, res) => {
   }
 };
 
-// 3. Login
+// ----------------------------------------------------
+// 3. LOGIN ENDPOINT
+// ----------------------------------------------------
 exports.login = async (req, res) => {
   try {
     const { email, password, role = 'USER' } = req.body;
@@ -120,7 +189,6 @@ exports.login = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Trim API Response (#17)
     res.json({
       message: "Login successful",
       token,

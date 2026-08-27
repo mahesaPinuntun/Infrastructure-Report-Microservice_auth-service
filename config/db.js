@@ -1,19 +1,18 @@
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
-  // 1. Jika sudah terhubung, langsung reuse koneksi yang ada
   if (mongoose.connection.readyState >= 1) {
     return;
   }
 
-  // 2. Hubungkan ke MongoDB Atlas
-  await mongoose.connect(process.env.MONGO_URI, {
-    tls: true,
-    serverSelectionTimeoutMS: 5000,
-    bufferCommands: false // Matikan buffering agar jika db mati langsung error, bukan menggantung
-  });
+  if (!process.env.MONGO_URI) {
+    throw new Error("MONGO_URI is missing from environment variables.");
+  }
 
-  console.log('[auth-service] Connected to MongoDB Atlas');
+  await mongoose.connect(process.env.MONGO_URI, {
+    serverSelectionTimeoutMS: 5000,
+    bufferCommands: false // Jangan gantung execution jika DB bermasalah
+  });
 };
 
 module.exports = connectDB;

@@ -15,7 +15,7 @@ const getModelByRole = (role) => {
   }
 };
 
-// Helper Internal untuk Eksekusi Registrasi (Prevent Code Duplication)
+// Helper Internal untuk Eksekusi Registrasi
 const executeRegistration = async (res, TargetModel, userData, email, name) => {
   const existingUser = await TargetModel.findOne({ email });
   if (existingUser) {
@@ -39,6 +39,41 @@ const executeRegistration = async (res, TargetModel, userData, email, name) => {
 
   return res.status(201).json({
     message: "Registration successful. Please check your email to verify your account."
+  });
+};
+
+// Helper Internal untuk Eksekusi Login
+const executeLogin = async (res, TargetModel, role, collectionName, email, password) => {
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required." });
+  }
+
+  const user = await TargetModel.findOne({ email });
+  if (!user) return res.status(401).json({ error: "Invalid email or password." });
+
+  if (user.status === 'PENDING') {
+    return res.status(403).json({ error: "Please verify your email address before logging in." });
+  }
+
+  const isMatch = await bcrypt.compare(password, user.passwordHash);
+  if (!isMatch) return res.status(401).json({ error: "Invalid email or password." });
+
+  const token = jwt.sign(
+    { id: user._id, role, collection: collectionName },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+
+  return res.json({
+    message: "Login successful",
+    token,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role,
+      avatarUrl: user.avatarUrl
+    }
   });
 };
 
@@ -163,43 +198,44 @@ exports.verifyAccount = async (req, res) => {
 };
 
 // ----------------------------------------------------
-// 3. LOGIN ENDPOINT
+// 3. LOGIN ENDPOINTS PER ROLE
 // ----------------------------------------------------
-exports.login = async (req, res) => {
+
+// Login Warga / Standard User
+exports.loginUser = async (req, res) => {
   try {
-    const { email, password, role = 'USER' } = req.body;
+    const { email, password } = req.body;
+    await executeLogin(res, User, 'USER', 'users', email, password);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
-    const target = getModelByRole(role);
-    if (!target) return res.status(400).json({ error: "Invalid role specified." });
+// Login System Admin
+exports.loginAdmin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    await executeLogin(res, Admin, 'ADMIN', 'admins', email, password);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
-    const user = await target.model.findOne({ email });
-    if (!user) return res.status(401).json({ error: "Invalid email or password." });
+// Login Infrastructure Manager
+exports.loginManager = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    await executeLogin(res, InfrastructureManager, 'INFRASTRUCTURE_MANAGER', 'infrastructure_managers', email, password);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
-    if (user.status === 'PENDING') {
-      return res.status(403).json({ error: "Please verify your email address before logging in." });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch) return res.status(401).json({ error: "Invalid email or password." });
-
-    // Generate JWT Token
-    const token = jwt.sign(
-      { id: user._id, role, collection: target.collectionName },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.json({
-      message: "Login successful",
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role,
-        avatarUrl: user.avatarUrl
-      }
-    });
+// Login Technician
+exports.loginTechnician = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    await executeLogin(res, Technician, 'TECHNICIAN', 'technicians', email, password);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

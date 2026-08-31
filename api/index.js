@@ -7,15 +7,36 @@ const authController = require('../controllers/authController');
 
 const app = express();
 
-// Security & Body Parser
+// 1. Opsi CORS Eksplisit
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle Preflight OPTIONS Request secara langsung
+
+// 2. Security & Body Parser
 app.use(helmet());
-app.use(cors());
 app.use(express.json());
 
-// Serverless DB Connection Handler
+// 3. Base & Health Routes (Tanpa perlu koneksi DB agar responsif)
+app.get('/', (req, res) => {
+  res.json({ message: "auth-service is running", status: "OK" });
+});
+
+app.get('/api/auth/health', (req, res) => {
+  res.json({ status: "Auth Service Active" });
+});
+
+// 4. Serverless DB Connection Handler
 app.use(async (req, res, next) => {
   try {
-    await connectDB();
+    if (typeof connectDB === 'function') {
+      await connectDB();
+    }
     next();
   } catch (err) {
     console.error('[auth-service] DB Connection Error:', err);
@@ -23,22 +44,13 @@ app.use(async (req, res, next) => {
   }
 });
 
-// Rate Limiter
+// 5. Rate Limiter
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 20, // Diperlonggar untuk menghindari blokir tiba-tiba saat dev
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many authentication attempts, please try again later." }
-});
-
-// Base & Health Routes
-app.get('/', (req, res) => {
-  res.json({ message: "auth-service is running", status: "OK" });
-});
-
-app.get('/api/auth/health', (req, res) => {
-  res.json({ status: "Auth Service Active" });
 });
 
 // ----------------------------------------------------
@@ -62,7 +74,7 @@ app.post('/api/auth/login/technician', authLimiter, authController.loginTechnici
 // ----------------------------------------------------
 app.get('/api/auth/verify', authController.verifyAccount);
 
-// Global Error Handler (Prevents Function Crash)
+// Global Error Handler
 app.use((err, req, res, next) => {
   console.error('[auth-service] Unhandled Error:', err);
   res.status(500).json({ error: err.message || "Internal Server Error" });

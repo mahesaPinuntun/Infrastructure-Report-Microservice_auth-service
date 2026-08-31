@@ -7,22 +7,34 @@ const authController = require('../controllers/authController');
 
 const app = express();
 
-// 1. Opsi CORS Eksplisit
-const corsOptions = {
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  credentials: true
-};
+// 1. Opsi CORS Eksplisit & Penanganan Preflight Langsung
+const allowedOrigins = [
+  'https://infrastructure-report-microservice-admin-manager.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173'
+];
 
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle Preflight OPTIONS Request secara langsung
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin) || !origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  // Langsung balas 200 OK untuk preflight OPTIONS request tanpa redirect/DB connect
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
 
 // 2. Security & Body Parser
 app.use(helmet());
 app.use(express.json());
 
-// 3. Base & Health Routes (Tanpa perlu koneksi DB agar responsif)
+// 3. Base & Health Routes
 app.get('/', (req, res) => {
   res.json({ message: "auth-service is running", status: "OK" });
 });
@@ -47,7 +59,7 @@ app.use(async (req, res, next) => {
 // 5. Rate Limiter
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20, // Diperlonggar untuk menghindari blokir tiba-tiba saat dev
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many authentication attempts, please try again later." }

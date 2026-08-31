@@ -7,106 +7,52 @@ const authController = require('../controllers/authController');
 
 const app = express();
 
-// 1. Daftar Origin yang Diizinkan
-const allowedOrigins = [
-  'https://infrastructure-report-microservice-admin-manager.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:8080'
-];
+// 1. CORS Configuration (Mendukung Credential + Exact Origin)
+const corsOptions = {
+  origin: [
+    'https://infrastructure-report-microservice-admin-manager.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
 
-// 2. Middleware Manual CORS & Preflight Response Teratas
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  
-  // Set Access-Control-Allow-Origin secara dinamis
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
-  // Set Access-Control Headers Lainnya
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Access-Control-Allow-Methods');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Max-Age', '86400'); // Cache Preflight selama 24 jam
-
-  // Langsung balas HTTP 200 OK untuk Preflight OPTIONS Request (Bypass DB & Limiter)
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  next();
-});
-
-// 3. Configure Helmet (Disable Cross-Origin-Resource-Policy agar tidak konflik dengan CORS)
-app.use(helmet({
-  crossOriginResourcePolicy: false,
-}));
+// Disable CORP di Helmet agar tidak bertabrakan dengan CORS
+app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(express.json());
 
-// 4. Base & Health Routes (Sangat Cepat, Tanpa Tunggu DB Connection)
-app.get('/', (req, res) => {
-  res.json({ message: "auth-service is running", status: "OK" });
-});
+// 2. Base & Health Routes
+app.get('/', (req, res) => res.json({ message: "auth-service is running", status: "OK" }));
+app.get('/api/auth/health', (req, res) => res.json({ status: "Auth Service Active" }));
 
-app.get('/api/auth/health', (req, res) => {
-  res.json({ status: "Auth Service Active" });
-});
-
-// 5. Serverless DB Connection Handler
+// 3. Serverless DB Connection Handler
 app.use(async (req, res, next) => {
   try {
-    if (typeof connectDB === 'function') {
-      await connectDB();
-    }
+    if (typeof connectDB === 'function') await connectDB();
     next();
   } catch (err) {
-    console.error('[auth-service] DB Connection Error:', err);
     res.status(500).json({ error: "Database connection failed: " + err.message });
   }
 });
 
-// 6. Rate Limiter (Diperlonggar untuk Pengujian)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 50,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many authentication attempts, please try again later." }
-});
+// 4. Rate Limiter & Endpoints
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 50 });
 
-// ----------------------------------------------------
-// Dedicated Registration Endpoints Per Role
-// ----------------------------------------------------
+app.post('/api/auth/login/admin', authLimiter, authController.loginAdmin);
+app.post('/api/auth/login/manager', authLimiter, authController.loginManager);
+app.post('/api/auth/login/user', authLimiter, authController.loginUser);
+app.post('/api/auth/login/technician', authLimiter, authController.loginTechnician);
+
 app.post('/api/auth/register/user', authLimiter, authController.registerUser);
 app.post('/api/auth/register/admin', authLimiter, authController.registerAdmin);
 app.post('/api/auth/register/manager', authLimiter, authController.registerManager);
 app.post('/api/auth/register/technician', authLimiter, authController.registerTechnician);
 
-// ----------------------------------------------------
-// Dedicated Login Endpoints Per Role
-// ----------------------------------------------------
-app.post('/api/auth/login/user', authLimiter, authController.loginUser);
-app.post('/api/auth/login/admin', authLimiter, authController.loginAdmin);
-app.post('/api/auth/login/manager', authLimiter, authController.loginManager);
-app.post('/api/auth/login/technician', authLimiter, authController.loginTechnician);
-
-// ----------------------------------------------------
-// Account Verification Endpoint
-// ----------------------------------------------------
 app.get('/api/auth/verify', authController.verifyAccount);
-
-// Global Error Handler
-app.use((err, req, res, next) => {
-  console.error('[auth-service] Unhandled Error:', err);
-  res.status(500).json({ error: err.message || "Internal Server Error" });
-});
-
-// Local Development Server
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  const PORT = process.env.PORT || 8001;
-  app.listen(PORT, () => console.log(`Auth Service running on port ${PORT}`));
-}
 
 module.exports = app;

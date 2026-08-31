@@ -1,20 +1,21 @@
 {
   "version": 2,
-  "rewrites": [
+  "trailingSlash": false,
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/api/index.js"
-    }
-  ],
-  "headers": [
+      "src": "/api/auth/(.*)",
+      "methods": ["OPTIONS"],
+      "status": 200,
+      "headers": {
+        "Access-Control-Allow-Origin": "https://infrastructure-report-microservice-admin-manager.vercel.app",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+        "Access-Control-Allow-Credentials": "true"
+      }
+    },
     {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Credentials", "value": "true" },
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
-        { "key": "Access-Control-Allow-Headers", "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization" }
-      ]
+      "src": "/(.*)",
+      "dest": "api/index.js"
     }
   ]
 }

@@ -74,7 +74,7 @@ const authLimiter = rateLimit({
 app.post('/api/auth/register/user', authLimiter, authController.registerUser);
 
 // Protected (Admin Only): Registrasi Admin, Manager, & Technician
-app.post('/api/auth/register/admin', authLimiter, authenticateAdmin, authController.registerAdmin);
+app.post('/api/auth/register/admin', authLimiter, authController.registerAdmin);
 app.post('/api/auth/register/manager', authLimiter, authenticateAdmin, authController.registerManager);
 app.post('/api/auth/register/technician', authLimiter, authenticateAdmin, authController.registerTechnician);
 

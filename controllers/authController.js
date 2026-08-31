@@ -1,8 +1,19 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { User } = require('../models/Entities'); // Satu model unified User/Entities
+const { Admin, InfrastructureManager, Technician, User } = require('../models/schemas');
 const sendVerificationEmail = require('../utils/emailer');
+
+// Helper untuk memilih Model Mongoose berdasarkan Role
+const getModelByRole = (role) => {
+  switch (role) {
+    case 'ADMIN': return Admin;
+    case 'INFRASTRUCTURE_MANAGER': return InfrastructureManager;
+    case 'TECHNICIAN': return Technician;
+    case 'USER': return User;
+    default: return User;
+  }
+};
 
 // =========================================================================
 // 1. HELPER REGISTRASI INTERNAL
@@ -15,21 +26,26 @@ const executeRegistration = async (req, res, roleName) => {
       return res.status(400).json({ error: "Nama, email, dan password wajib diisi." });
     }
 
-    // Cek apakah email sudah terdaftar
-    const existingUser = await User.findOne({ email });
+    const TargetModel = getModelByRole(roleName);
+
+    // Cek apakah email sudah terdaftar di koleksi target
+    const existingUser = await TargetModel.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ error: "Email sudah terdaftar." });
+      return res.status(400).json({ error: "Email already registered." });
     }
 
+    // Hash Password
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Jam
 
-    const newUser = new User({
+    const newUser = new TargetModel({
       name,
       email,
-      password, // Password akan di-hash oleh pre-save hook di Entities.js
+      passwordHash,
       role: roleName,
-      status: 'PENDING_VERIFICATION',
+      status: roleName === 'ADMIN' ? 'ACTIVE' : 'PENDING',
       verificationToken,
       tokenExpiresAt,
       ...(phoneNumber && { phoneNumber }),
@@ -41,11 +57,15 @@ const executeRegistration = async (req, res, roleName) => {
 
     // Kirim email verifikasi jika utilitas emailer tersedia
     if (typeof sendVerificationEmail === 'function') {
-      await sendVerificationEmail(email, name, verificationToken);
+      try {
+        await sendVerificationEmail(email, name, verificationToken);
+      } catch (mailErr) {
+        console.warn('[auth-service] Email sending failed:', mailErr.message);
+      }
     }
 
     return res.status(201).json({
-      message: "Registrasi berhasil. Silakan cek email Anda untuk verifikasi akun.",
+      message: "Registration successful. Please check your email to verify your account.",
       user: {
         id: newUser._id,
         name: newUser.name,
@@ -71,26 +91,27 @@ const executeLogin = async (req, res, roleName) => {
       return res.status(400).json({ error: "Email dan password wajib diisi." });
     }
 
-    // Cari user berdasarkan email
-    const user = await User.findOne({ email });
-    if (!user) {
+    const TargetModel = getModelByRole(roleName);
+
+    // Cari user di koleksi spesifiknya
+    const userDoc = await TargetModel.findOne({ email });
+    if (!userDoc) {
       return res.status(401).json({ error: "Email atau password salah." });
     }
 
-    // Verifikasi kata sandi
-    const isMatch = await bcrypt.compare(password, user.password);
+    // Verifikasi passwordHash di Mongo
+    const isMatch = await bcrypt.compare(password, userDoc.passwordHash);
     if (!isMatch) {
       return res.status(401).json({ error: "Email atau password salah." });
     }
 
-    // Pastikan role sesuai jika diminta role spesifik
-    const userRole = (user.role || roleName).toUpperCase();
+    const userRole = (userDoc.role || roleName).toUpperCase();
 
-    // Buat JWT Token yang membawa id, email, dan role
+    // Buat JWT Token
     const token = jwt.sign(
       { 
-        id: user._id, 
-        email: user.email,
+        id: userDoc._id, 
+        email: userDoc.email,
         role: userRole 
       },
       process.env.JWT_SECRET || 'secret_key_fallback',
@@ -101,11 +122,11 @@ const executeLogin = async (req, res, roleName) => {
       message: 'Login berhasil',
       token,
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
+        id: userDoc._id,
+        name: userDoc.name,
+        email: userDoc.email,
         role: userRole,
-        status: user.status || 'ACTIVE'
+        status: userDoc.status || 'ACTIVE'
       }
     });
 
@@ -120,7 +141,7 @@ const executeLogin = async (req, res, roleName) => {
 // =========================================================================
 const registerUser = async (req, res) => executeRegistration(req, res, 'USER');
 const registerAdmin = async (req, res) => executeRegistration(req, res, 'ADMIN');
-const registerManager = async (req, res) => executeRegistration(req, res, 'MANAGER');
+const registerManager = async (req, res) => executeRegistration(req, res, 'INFRASTRUCTURE_MANAGER');
 const registerTechnician = async (req, res) => executeRegistration(req, res, 'TECHNICIAN');
 
 // =========================================================================
@@ -128,7 +149,7 @@ const registerTechnician = async (req, res) => executeRegistration(req, res, 'TE
 // =========================================================================
 const loginUser = async (req, res) => executeLogin(req, res, 'USER');
 const loginAdmin = async (req, res) => executeLogin(req, res, 'ADMIN');
-const loginManager = async (req, res) => executeLogin(req, res, 'MANAGER');
+const loginManager = async (req, res) => executeLogin(req, res, 'INFRASTRUCTURE_MANAGER');
 const loginTechnician = async (req, res) => executeLogin(req, res, 'TECHNICIAN');
 
 // =========================================================================
@@ -139,10 +160,16 @@ const verifyAccount = async (req, res) => {
     const { token } = req.query;
     if (!token) return res.status(400).json({ error: "Verification token is required." });
 
-    const foundUser = await User.findOne({
-      verificationToken: token,
-      tokenExpiresAt: { $gt: Date.now() }
-    });
+    const roles = [Admin, InfrastructureManager, Technician, User];
+    let foundUser = null;
+
+    for (const Model of roles) {
+      foundUser = await Model.findOne({
+        verificationToken: token,
+        tokenExpiresAt: { $gt: Date.now() }
+      });
+      if (foundUser) break;
+    }
 
     if (!foundUser) {
       return res.status(400).json({ error: "Invalid or expired verification token." });

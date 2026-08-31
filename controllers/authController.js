@@ -185,6 +185,180 @@ const verifyAccount = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
+// =========================================================================
+// 6. EDIT ACCOUNT HANDLERS
+// =========================================================================
+
+// Edit Akun oleh Admin (Berdasarkan ID & Role/TargetModel)
+const editUserByAdmin = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { name, role, status, phoneNumber, department, specialization } = req.body;
+
+    const roles = [Admin, InfrastructureManager, Technician, User];
+    let targetUser = null;
+    let CurrentModel = null;
+
+    for (const Model of roles) {
+      targetUser = await Model.findById(userId);
+      if (targetUser) {
+        CurrentModel = Model;
+        break;
+      }
+    }
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "Pengguna tidak ditemukan." });
+    }
+
+    // Jika role diubah ke model/koleksi lain
+    if (role && role.toUpperCase() !== targetUser.role) {
+      const newRole = role.toUpperCase();
+      const TargetModel = getModelByRole(newRole);
+
+      const newUserDoc = new TargetModel({
+        name: name || targetUser.name,
+        email: targetUser.email,
+        passwordHash: targetUser.passwordHash,
+        role: newRole,
+        status: status || targetUser.status,
+        phoneNumber: phoneNumber || targetUser.phoneNumber,
+        department: department || targetUser.department,
+        specialization: specialization || targetUser.specialization
+      });
+
+      await newUserDoc.save();
+      await CurrentModel.findByIdAndDelete(userId);
+
+      return res.json({
+        message: "Pengguna berhasil diperbarui dan dipindahkan ke role baru.",
+        user: newUserDoc
+      });
+    }
+
+    // Update standar pada koleksi yang sama
+    if (name) targetUser.name = name;
+    if (status) targetUser.status = status;
+    if (phoneNumber !== undefined) targetUser.phoneNumber = phoneNumber;
+    if (department !== undefined) targetUser.department = department;
+    if (specialization !== undefined) targetUser.specialization = specialization;
+
+    await targetUser.save();
+
+    return res.json({
+      message: "Data pengguna berhasil diperbarui oleh Admin.",
+      user: targetUser
+    });
+  } catch (error) {
+    console.error('[auth-service] Edit User By Admin Error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+// Edit Akun Mandiri oleh Pengguna (Berdasarkan Email)
+const editUserBySelf = async (req, res) => {
+  try {
+    const { email } = req.params;
+    const { name, password, phoneNumber, department, specialization } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email wajib disertakan dalam parameter." });
+    }
+
+    const roles = [Admin, InfrastructureManager, Technician, User];
+    let targetUser = null;
+
+    for (const Model of roles) {
+      targetUser = await Model.findOne({ email });
+      if (targetUser) break;
+    }
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "Pengguna dengan email tersebut tidak ditemukan." });
+    }
+
+    if (name) targetUser.name = name;
+    if (phoneNumber !== undefined) targetUser.phoneNumber = phoneNumber;
+    if (department !== undefined) targetUser.department = department;
+    if (specialization !== undefined) targetUser.specialization = specialization;
+
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      targetUser.passwordHash = await bcrypt.hash(password, salt);
+    }
+
+    await targetUser.save();
+
+    return res.json({
+      message: "Profil Anda berhasil diperbarui.",
+      user: {
+        id: targetUser._id,
+        name: targetUser.name,
+        email: targetUser.email,
+        role: targetUser.role
+      }
+    });
+  } catch (error) {
+    console.error('[auth-service] Edit User By Self Error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+// =========================================================================
+// 7. DELETE ACCOUNT HANDLERS
+// =========================================================================
+
+// Hapus Akun oleh Admin (Berdasarkan ID)
+const deleteUserByAdmin = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const roles = [Admin, InfrastructureManager, Technician, User];
+    let deletedUser = null;
+
+    for (const Model of roles) {
+      deletedUser = await Model.findByIdAndDelete(userId);
+      if (deletedUser) break;
+    }
+
+    if (!deletedUser) {
+      return res.status(404).json({ error: "Pengguna tidak ditemukan." });
+    }
+
+    return res.json({ message: `Pengguna ${deletedUser.email} berhasil dihapus oleh Admin.` });
+  } catch (error) {
+    console.error('[auth-service] Delete User By Admin Error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+// Hapus Akun Mandiri oleh Pengguna (Berdasarkan Email)
+const deleteUserBySelf = async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email wajib disertakan." });
+    }
+
+    const roles = [Admin, InfrastructureManager, Technician, User];
+    let deletedUser = null;
+
+    for (const Model of roles) {
+      deletedUser = await Model.findOneAndDelete({ email });
+      if (deletedUser) break;
+    }
+
+    if (!deletedUser) {
+      return res.status(404).json({ error: "Pengguna dengan email tersebut tidak ditemukan." });
+    }
+
+    return res.json({ message: `Akun ${email} berhasil dihapus.` });
+  } catch (error) {
+    console.error('[auth-service] Delete User By Self Error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
 
 module.exports = {
   executeRegistration,
@@ -197,5 +371,9 @@ module.exports = {
   loginAdmin,
   loginManager,
   loginTechnician,
-  verifyAccount
+  verifyAccount,
+  editUserByAdmin,
+  editUserBySelf,
+  deleteUserByAdmin,
+  deleteUserBySelf
 };

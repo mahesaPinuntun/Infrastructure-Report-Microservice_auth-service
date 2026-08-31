@@ -43,38 +43,38 @@ const executeRegistration = async (res, TargetModel, userData, email, name) => {
 };
 
 // Helper Internal untuk Eksekusi Login
-const executeLogin = async (res, TargetModel, role, collectionName, email, password) => {
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required." });
+const executeLogin = async (req, res, userDoc, collectionName) => {
+  try {
+    // 1. Ambil role resmi dari database (atau tetapkan dari konteks login)
+    const role = (userDoc.role || collectionName).toUpperCase();
+
+    // 2. Buat Token JWT dengan payload id, role, dan collection
+    const token = jwt.sign(
+      { 
+        id: userDoc._id, 
+        email: userDoc.email,
+        role: role, 
+        collection: collectionName 
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // 3. Kembalikan respon ke client
+    return res.json({
+      message: 'Login berhasil',
+      token,
+      user: {
+        id: userDoc._id,
+        name: userDoc.name,
+        email: userDoc.email,
+        role: role
+      }
+    });
+  } catch (error) {
+    console.error('Login Error:', error);
+    return res.status(500).json({ error: error.message });
   }
-
-  const user = await TargetModel.findOne({ email });
-  if (!user) return res.status(401).json({ error: "Invalid email or password." });
-
-  if (user.status === 'PENDING') {
-    return res.status(403).json({ error: "Please verify your email address before logging in." });
-  }
-
-  const isMatch = await bcrypt.compare(password, user.passwordHash);
-  if (!isMatch) return res.status(401).json({ error: "Invalid email or password." });
-
-  const token = jwt.sign(
-    { id: user._id, role, collection: collectionName },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
-
-  return res.json({
-    message: "Login successful",
-    token,
-    user: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role,
-      avatarUrl: user.avatarUrl
-    }
-  });
 };
 
 // ----------------------------------------------------

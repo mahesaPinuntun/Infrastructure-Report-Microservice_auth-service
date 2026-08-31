@@ -140,7 +140,29 @@ const executeLogin = async (req, res, roleName) => {
 // 3. HANDLERS REGISTRASI PER ROLE
 // =========================================================================
 const registerUser = async (req, res) => executeRegistration(req, res, 'USER');
-const registerAdmin = async (req, res) => executeRegistration(req, res, 'ADMIN');
+
+// Registrasi Admin (Membutuhkan Secret PIN dari .env)
+const registerAdmin = async (req, res) => {
+  try {
+    const { name, email, password, adminPin } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "Nama, email, dan password wajib diisi." });
+    }
+
+    const SYSTEM_ADMIN_PIN = process.env.ADMIN_PIN || 'kangkangkubundarahmalagingepel';
+
+    if (!adminPin || adminPin !== SYSTEM_ADMIN_PIN) {
+      return res.status(403).json({ error: "Secret PIN Admin tidak valid atau tidak diisi." });
+    }
+
+    await executeRegistration(req, res, 'ADMIN');
+  } catch (error) {
+    console.error('[auth-service] Register Admin Error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 const registerManager = async (req, res) => executeRegistration(req, res, 'INFRASTRUCTURE_MANAGER');
 const registerTechnician = async (req, res) => executeRegistration(req, res, 'TECHNICIAN');
 
@@ -185,6 +207,7 @@ const verifyAccount = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
+
 // =========================================================================
 // 6. EDIT ACCOUNT HANDLERS
 // =========================================================================

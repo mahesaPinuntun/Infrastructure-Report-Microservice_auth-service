@@ -1,186 +1,148 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { Admin, InfrastructureManager, Technician, User } = require('../models/schemas');
+const { User } = require('../models/Entities'); // Satu model unified User/Entities
 const sendVerificationEmail = require('../utils/emailer');
 
-// Helper untuk memilih Model & Collection berdasarkan Role
-const getModelByRole = (role) => {
-  switch (role) {
-    case 'ADMIN': return { model: Admin, collectionName: 'admins' };
-    case 'INFRASTRUCTURE_MANAGER': return { model: InfrastructureManager, collectionName: 'infrastructure_managers' };
-    case 'TECHNICIAN': return { model: Technician, collectionName: 'technicians' };
-    case 'USER': return { model: User, collectionName: 'users' };
-    default: return null;
-  }
-};
-
-// Helper Internal untuk Eksekusi Registrasi
-const executeRegistration = async (res, TargetModel, userData, email, name) => {
-  const existingUser = await TargetModel.findOne({ email });
-  if (existingUser) {
-    return res.status(400).json({ error: "Email already registered." });
-  }
-
-  const salt = await bcrypt.genSalt(10);
-  const passwordHash = await bcrypt.hash(userData.password, salt);
-  const verificationToken = crypto.randomBytes(32).toString('hex');
-  const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Hours
-
-  const newUser = new TargetModel({
-    ...userData,
-    passwordHash,
-    verificationToken,
-    tokenExpiresAt
-  });
-
-  await newUser.save();
-  await sendVerificationEmail(email, name, verificationToken);
-
-  return res.status(201).json({
-    message: "Registration successful. Please check your email to verify your account."
-  });
-};
-
-// Helper Internal untuk Eksekusi Login
-const executeLogin = async (req, res, userDoc, collectionName) => {
+// =========================================================================
+// 1. HELPER REGISTRASI INTERNAL
+// =========================================================================
+const executeRegistration = async (req, res, roleName) => {
   try {
-    // 1. Ambil role resmi dari database (atau tetapkan dari konteks login)
-    const role = (userDoc.role || collectionName).toUpperCase();
+    const { name, email, password, phoneNumber, department, specialization } = req.body;
 
-    // 2. Buat Token JWT dengan payload id, role, dan collection
-    const token = jwt.sign(
-      { 
-        id: userDoc._id, 
-        email: userDoc.email,
-        role: role, 
-        collection: collectionName 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "Nama, email, dan password wajib diisi." });
+    }
 
-    // 3. Kembalikan respon ke client
-    return res.json({
-      message: 'Login berhasil',
-      token,
+    // Cek apakah email sudah terdaftar
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email sudah terdaftar." });
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Jam
+
+    const newUser = new User({
+      name,
+      email,
+      password, // Password akan di-hash oleh pre-save hook di Entities.js
+      role: roleName,
+      status: 'PENDING_VERIFICATION',
+      verificationToken,
+      tokenExpiresAt,
+      ...(phoneNumber && { phoneNumber }),
+      ...(department && { department }),
+      ...(specialization && { specialization })
+    });
+
+    await newUser.save();
+
+    // Kirim email verifikasi jika utilitas emailer tersedia
+    if (typeof sendVerificationEmail === 'function') {
+      await sendVerificationEmail(email, name, verificationToken);
+    }
+
+    return res.status(201).json({
+      message: "Registrasi berhasil. Silakan cek email Anda untuk verifikasi akun.",
       user: {
-        id: userDoc._id,
-        name: userDoc.name,
-        email: userDoc.email,
-        role: role
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role
       }
     });
+
   } catch (error) {
-    console.error('Login Error:', error);
+    console.error('[auth-service] Registration Error:', error);
     return res.status(500).json({ error: error.message });
   }
 };
 
-// ----------------------------------------------------
-// 1. REGISTRATION ENDPOINTS PER ROLE
-// ----------------------------------------------------
-
-// Register Warga / Standard User
-exports.registerUser = async (req, res) => {
+// =========================================================================
+// 2. HELPER LOGIN INTERNAL (Urutan Wajib: req, res, roleName)
+// =========================================================================
+const executeLogin = async (req, res, roleName) => {
   try {
-    const { name, email, password, phoneNumber } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "Name, email, and password are required." });
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email dan password wajib diisi." });
     }
 
-    await executeRegistration(res, User, {
-      name,
-      email,
-      password,
-      role: 'USER',
-      ...(phoneNumber && { phoneNumber })
-    }, email, name);
+    // Cari user berdasarkan email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ error: "Email atau password salah." });
+    }
+
+    // Verifikasi kata sandi
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: "Email atau password salah." });
+    }
+
+    // Pastikan role sesuai jika diminta role spesifik
+    const userRole = (user.role || roleName).toUpperCase();
+
+    // Buat JWT Token yang membawa id, email, dan role
+    const token = jwt.sign(
+      { 
+        id: user._id, 
+        email: user.email,
+        role: userRole 
+      },
+      process.env.JWT_SECRET || 'secret_key_fallback',
+      { expiresIn: '7d' }
+    );
+
+    return res.status(200).json({
+      message: 'Login berhasil',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: userRole,
+        status: user.status || 'ACTIVE'
+      }
+    });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('[auth-service] Execute Login Error:', error);
+    return res.status(500).json({ error: error.message || 'Gagal memproses token login.' });
   }
 };
 
-// Register System Admin
-exports.registerAdmin = async (req, res) => {
-  try {
-    const { name, email, password, phoneNumber } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "Name, email, and password are required." });
-    }
+// =========================================================================
+// 3. HANDLERS REGISTRASI PER ROLE
+// =========================================================================
+const registerUser = async (req, res) => executeRegistration(req, res, 'USER');
+const registerAdmin = async (req, res) => executeRegistration(req, res, 'ADMIN');
+const registerManager = async (req, res) => executeRegistration(req, res, 'MANAGER');
+const registerTechnician = async (req, res) => executeRegistration(req, res, 'TECHNICIAN');
 
-    await executeRegistration(res, Admin, {
-      name,
-      email,
-      password,
-      role: 'ADMIN',
-      ...(phoneNumber && { phoneNumber })
-    }, email, name);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
+// =========================================================================
+// 4. HANDLERS LOGIN PER ROLE
+// =========================================================================
+const loginUser = async (req, res) => executeLogin(req, res, 'USER');
+const loginAdmin = async (req, res) => executeLogin(req, res, 'ADMIN');
+const loginManager = async (req, res) => executeLogin(req, res, 'MANAGER');
+const loginTechnician = async (req, res) => executeLogin(req, res, 'TECHNICIAN');
 
-// Register Infrastructure Manager
-exports.registerManager = async (req, res) => {
-  try {
-    const { name, email, password, phoneNumber, department } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "Name, email, and password are required." });
-    }
-
-    await executeRegistration(res, InfrastructureManager, {
-      name,
-      email,
-      password,
-      role: 'INFRASTRUCTURE_MANAGER',
-      ...(phoneNumber && { phoneNumber }),
-      ...(department && { department })
-    }, email, name);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Register Technician
-exports.registerTechnician = async (req, res) => {
-  try {
-    const { name, email, password, phoneNumber, specialization } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "Name, email, and password are required." });
-    }
-
-    await executeRegistration(res, Technician, {
-      name,
-      email,
-      password,
-      role: 'TECHNICIAN',
-      ...(phoneNumber && { phoneNumber }),
-      ...(specialization && { specialization })
-    }, email, name);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// ----------------------------------------------------
-// 2. ACCOUNT EMAIL VERIFICATION
-// ----------------------------------------------------
-exports.verifyAccount = async (req, res) => {
+// =========================================================================
+// 5. ACCOUNT EMAIL VERIFICATION
+// =========================================================================
+const verifyAccount = async (req, res) => {
   try {
     const { token } = req.query;
     if (!token) return res.status(400).json({ error: "Verification token is required." });
 
-    const roles = [Admin, InfrastructureManager, Technician, User];
-    let foundUser = null;
-
-    for (const Model of roles) {
-      foundUser = await Model.findOne({
-        verificationToken: token,
-        tokenExpiresAt: { $gt: Date.now() }
-      });
-      if (foundUser) break;
-    }
+    const foundUser = await User.findOne({
+      verificationToken: token,
+      tokenExpiresAt: { $gt: Date.now() }
+    });
 
     if (!foundUser) {
       return res.status(400).json({ error: "Invalid or expired verification token." });
@@ -191,52 +153,22 @@ exports.verifyAccount = async (req, res) => {
     foundUser.tokenExpiresAt = undefined;
     await foundUser.save();
 
-    res.json({ message: "Account successfully verified. You can now login." });
+    return res.json({ message: "Account successfully verified. You can now login." });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 };
 
-// ----------------------------------------------------
-// 3. LOGIN ENDPOINTS PER ROLE
-// ----------------------------------------------------
-
-// Login Warga / Standard User
-exports.loginUser = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    await executeLogin(res, User, 'USER', 'users', email, password);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Login System Admin
-exports.loginAdmin = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    await executeLogin(res, Admin, 'ADMIN', 'admins', email, password);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Login Infrastructure Manager
-exports.loginManager = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    await executeLogin(res, InfrastructureManager, 'INFRASTRUCTURE_MANAGER', 'infrastructure_managers', email, password);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Login Technician
-exports.loginTechnician = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    await executeLogin(res, Technician, 'TECHNICIAN', 'technicians', email, password);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+module.exports = {
+  executeRegistration,
+  executeLogin,
+  registerUser,
+  registerAdmin,
+  registerManager,
+  registerTechnician,
+  loginUser,
+  loginAdmin,
+  loginManager,
+  loginTechnician,
+  verifyAccount
 };

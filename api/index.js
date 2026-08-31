@@ -5,6 +5,10 @@ const rateLimit = require('express-rate-limit');
 const connectDB = require('../config/db');
 const authController = require('../controllers/authController');
 
+// Import Middleware Terpisah
+const { authenticateAdmin } = require('../middleware/adminAuthMiddleware');
+const { authenticateToken, requireSelfOrAdmin } = require('../middleware/userAuthMiddleware');
+
 const app = express();
 
 // 1. Handling CORS & Preflight OPTIONS Teratas
@@ -66,13 +70,16 @@ const authLimiter = rateLimit({
 // ----------------------------------------------------
 // Dedicated Registration Endpoints Per Role
 // ----------------------------------------------------
+// Public: Registrasi Warga / Standard User
 app.post('/api/auth/register/user', authLimiter, authController.registerUser);
-app.post('/api/auth/register/admin', authLimiter, authController.registerAdmin);
-app.post('/api/auth/register/manager', authLimiter, authController.registerManager);
-app.post('/api/auth/register/technician', authLimiter, authController.registerTechnician);
+
+// Protected (Admin Only): Registrasi Admin, Manager, & Technician
+app.post('/api/auth/register/admin', authLimiter, authenticateAdmin, authController.registerAdmin);
+app.post('/api/auth/register/manager', authLimiter, authenticateAdmin, authController.registerManager);
+app.post('/api/auth/register/technician', authLimiter, authenticateAdmin, authController.registerTechnician);
 
 // ----------------------------------------------------
-// Dedicated Login Endpoints Per Role
+// Dedicated Login Endpoints Per Role (Public)
 // ----------------------------------------------------
 app.post('/api/auth/login/user', authLimiter, authController.loginUser);
 app.post('/api/auth/login/admin', authLimiter, authController.loginAdmin);
@@ -80,16 +87,21 @@ app.post('/api/auth/login/manager', authLimiter, authController.loginManager);
 app.post('/api/auth/login/technician', authLimiter, authController.loginTechnician);
 
 // ----------------------------------------------------
-// Account Verification Endpoint
+// Account Verification Endpoint (Public)
 // ----------------------------------------------------
 app.get('/api/auth/verify', authController.verifyAccount);
-// Edit & Delete oleh Admin (by ID)
-app.put('/api/auth/users/:userId', authController.editUserByAdmin);
-app.delete('/api/auth/users/:userId', authController.deleteUserByAdmin);
 
-// Edit & Delete oleh User (by Email)
-app.put('/api/auth/users/email/:email', authController.editUserBySelf);
-app.delete('/api/auth/users/email/:email', authController.deleteUserBySelf);
+// ----------------------------------------------------
+// User Management Endpoints (Protected)
+// ----------------------------------------------------
+// Edit & Delete oleh Admin (Wajib Token JWT Admin)
+app.put('/api/auth/users/:userId', authenticateAdmin, authController.editUserByAdmin);
+app.delete('/api/auth/users/:userId', authenticateAdmin, authController.deleteUserByAdmin);
+
+// Edit & Delete Mandiri oleh User (Wajib Token + Email Milik Sendiri / Admin)
+app.put('/api/auth/users/email/:email', authenticateToken, requireSelfOrAdmin, authController.editUserBySelf);
+app.delete('/api/auth/users/email/:email', authenticateToken, requireSelfOrAdmin, authController.deleteUserBySelf);
+
 // Global Error Handler (Menangkap exception agar function tidak crash 500)
 app.use((err, req, res, next) => {
   console.error('[auth-service] Unhandled Error:', err);

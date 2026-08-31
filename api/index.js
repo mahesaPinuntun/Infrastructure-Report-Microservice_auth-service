@@ -83,7 +83,13 @@ app.post('/api/auth/login/technician', authLimiter, authController.loginTechnici
 // Account Verification Endpoint
 // ----------------------------------------------------
 app.get('/api/auth/verify', authController.verifyAccount);
+// Edit & Delete oleh Admin (by ID)
+app.put('/api/auth/users/:userId', authController.editUserByAdmin);
+app.delete('/api/auth/users/:userId', authController.deleteUserByAdmin);
 
+// Edit & Delete oleh User (by Email)
+app.put('/api/auth/users/email/:email', authController.editUserBySelf);
+app.delete('/api/auth/users/email/:email', authController.deleteUserBySelf);
 // Global Error Handler (Menangkap exception agar function tidak crash 500)
 app.use((err, req, res, next) => {
   console.error('[auth-service] Unhandled Error:', err);

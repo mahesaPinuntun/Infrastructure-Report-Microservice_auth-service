@@ -7,34 +7,45 @@ const authController = require('../controllers/authController');
 
 const app = express();
 
-// 1. Opsi CORS Eksplisit & Penanganan Preflight Langsung
+// 1. Daftar Origin yang Diizinkan
 const allowedOrigins = [
   'https://infrastructure-report-microservice-admin-manager.vercel.app',
   'http://localhost:3000',
-  'http://localhost:5173'
+  'http://localhost:5173',
+  'http://localhost:8080'
 ];
 
+// 2. Middleware Manual CORS & Preflight Response Teratas
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin) || !origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  
+  // Set Access-Control-Allow-Origin secara dinamis
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
-  // Langsung balas 200 OK untuk preflight OPTIONS request tanpa redirect/DB connect
+  // Set Access-Control Headers Lainnya
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Access-Control-Allow-Methods');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400'); // Cache Preflight selama 24 jam
+
+  // Langsung balas HTTP 200 OK untuk Preflight OPTIONS Request (Bypass DB & Limiter)
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
   next();
 });
 
-// 2. Security & Body Parser
-app.use(helmet());
+// 3. Configure Helmet (Disable Cross-Origin-Resource-Policy agar tidak konflik dengan CORS)
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+}));
 app.use(express.json());
 
-// 3. Base & Health Routes
+// 4. Base & Health Routes (Sangat Cepat, Tanpa Tunggu DB Connection)
 app.get('/', (req, res) => {
   res.json({ message: "auth-service is running", status: "OK" });
 });
@@ -43,7 +54,7 @@ app.get('/api/auth/health', (req, res) => {
   res.json({ status: "Auth Service Active" });
 });
 
-// 4. Serverless DB Connection Handler
+// 5. Serverless DB Connection Handler
 app.use(async (req, res, next) => {
   try {
     if (typeof connectDB === 'function') {
@@ -56,10 +67,10 @@ app.use(async (req, res, next) => {
   }
 });
 
-// 5. Rate Limiter
+// 6. Rate Limiter (Diperlonggar untuk Pengujian)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many authentication attempts, please try again later." }

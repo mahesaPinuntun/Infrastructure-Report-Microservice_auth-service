@@ -112,6 +112,7 @@ const executeLogin = async (req, res, roleName) => {
       { 
         id: userDoc._id, 
         email: userDoc.email,
+        name: userDoc.name,
         role: userRole 
       },
       process.env.JWT_SECRET || 'secret_key_fallback',

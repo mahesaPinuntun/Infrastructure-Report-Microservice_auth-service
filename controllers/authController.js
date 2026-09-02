@@ -16,7 +16,7 @@ const getModelByRole = (role) => {
 };
 
 // =========================================================================
-// 1. HELPER REGISTRASI INTERNAL (Dukungan Phone & PhoneNumber Ganda)
+// 1. HELPER REGISTRASI INTERNAL (Dukungan Phone & PhoneNumber Ganda untuk Semua Role)
 // =========================================================================
 const executeRegistration = async (req, res, roleName) => {
   try {
@@ -51,7 +51,7 @@ const executeRegistration = async (req, res, roleName) => {
       status: roleName === 'ADMIN' ? 'ACTIVE' : 'PENDING',
       verificationToken,
       tokenExpiresAt,
-      // Simpan ke dua field agar kompatibel dengan seluruh skema model
+      // Simpan ke dua field agar kompatibel dengan seluruh skema model MongoDB (Admin, Manager, Technician, User)
       phone: contactNumber,
       phoneNumber: contactNumber,
       ...(department && { department }),
@@ -147,9 +147,14 @@ const executeLogin = async (req, res, roleName) => {
 };
 
 // =========================================================================
-// 3. HANDLERS REGISTRASI PER ROLE
+// 3. HANDLERS REGISTRASI PER ROLE (Pastikan Phone/PhoneNumber Selalu Terbawa)
 // =========================================================================
-const registerUser = async (req, res) => executeRegistration(req, res, 'USER');
+const registerUser = async (req, res) => {
+  const contactNumber = req.body.phone || req.body.phoneNumber || '';
+  req.body.phone = contactNumber;
+  req.body.phoneNumber = contactNumber;
+  await executeRegistration(req, res, 'USER');
+};
 
 // Registrasi Admin (Membutuhkan Secret PIN dari .env)
 const registerAdmin = async (req, res) => {
@@ -166,7 +171,7 @@ const registerAdmin = async (req, res) => {
       return res.status(403).json({ error: "Secret PIN Admin tidak valid atau tidak diisi." });
     }
 
-    // Set fallback nomor telepon ke req.body agar terbaca oleh helper executeRegistration
+    // Set nomor telepon ke req.body agar terbaca oleh helper executeRegistration
     const contactNumber = phone || phoneNumber || '';
     req.body.phone = contactNumber;
     req.body.phoneNumber = contactNumber;
@@ -178,8 +183,19 @@ const registerAdmin = async (req, res) => {
   }
 };
 
-const registerManager = async (req, res) => executeRegistration(req, res, 'INFRASTRUCTURE_MANAGER');
-const registerTechnician = async (req, res) => executeRegistration(req, res, 'TECHNICIAN');
+const registerManager = async (req, res) => {
+  const contactNumber = req.body.phone || req.body.phoneNumber || '';
+  req.body.phone = contactNumber;
+  req.body.phoneNumber = contactNumber;
+  await executeRegistration(req, res, 'INFRASTRUCTURE_MANAGER');
+};
+
+const registerTechnician = async (req, res) => {
+  const contactNumber = req.body.phone || req.body.phoneNumber || '';
+  req.body.phone = contactNumber;
+  req.body.phoneNumber = contactNumber;
+  await executeRegistration(req, res, 'TECHNICIAN');
+};
 
 // =========================================================================
 // 4. HANDLERS LOGIN PER ROLE

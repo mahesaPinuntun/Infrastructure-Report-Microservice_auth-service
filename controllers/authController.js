@@ -16,14 +16,29 @@ const getModelByRole = (role) => {
 };
 
 // =========================================================================
-// 1. HELPER REGISTRASI INTERNAL (Dukungan Phone & PhoneNumber Ganda untuk Semua Role)
+// 1. HELPER REGISTRASI INTERNAL (Dengan Validasi Presisi Attribute)
 // =========================================================================
 const executeRegistration = async (req, res, roleName) => {
   try {
     const { name, email, password, phone, phoneNumber, department, specialization } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "Nama, email, dan password wajib diisi." });
+    // 1. Validasi Atribut Wajib Utama (name, email, password, phone/phoneNumber)
+    const missingAttributes = [];
+    if (!name || name.trim() === '') missingAttributes.push('name');
+    if (!email || email.trim() === '') missingAttributes.push('email');
+    if (!password || password.trim() === '') missingAttributes.push('password');
+
+    const contactNumber = (phone || phoneNumber || '').trim();
+    if (!contactNumber) {
+      missingAttributes.push('phoneNumber');
+    }
+
+    // Jika ada atribut wajib yang belum diisi, kembalikan daftar atribut yang dibutuhkan
+    if (missingAttributes.length > 0) {
+      return res.status(400).json({
+        error: `Atribut yang dibutuhkan: ${missingAttributes.join(', ')}`,
+        missingAttributes
+      });
     }
 
     const TargetModel = getModelByRole(roleName);
@@ -40,9 +55,6 @@ const executeRegistration = async (req, res, roleName) => {
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Jam
 
-    // Ambil nilai nomor HP (bisa dikirim sebagai 'phone' atau 'phoneNumber')
-    const contactNumber = phone || phoneNumber || '';
-
     const newUser = new TargetModel({
       name,
       email,
@@ -51,7 +63,7 @@ const executeRegistration = async (req, res, roleName) => {
       status: roleName === 'ADMIN' ? 'ACTIVE' : 'PENDING',
       verificationToken,
       tokenExpiresAt,
-      // Simpan ke dua field agar kompatibel dengan seluruh skema model MongoDB (Admin, Manager, Technician, User)
+      // Simpan ke dua field agar kompatibel dengan seluruh skema model MongoDB
       phone: contactNumber,
       phoneNumber: contactNumber,
       ...(department && { department }),
@@ -88,14 +100,21 @@ const executeRegistration = async (req, res, roleName) => {
 };
 
 // =========================================================================
-// 2. HELPER LOGIN INTERNAL (Urutan Wajib: req, res, roleName)
+// 2. HELPER LOGIN INTERNAL
 // =========================================================================
 const executeLogin = async (req, res, roleName) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email dan password wajib diisi." });
+    const missingAttributes = [];
+    if (!email || email.trim() === '') missingAttributes.push('email');
+    if (!password || password.trim() === '') missingAttributes.push('password');
+
+    if (missingAttributes.length > 0) {
+      return res.status(400).json({
+        error: `Atribut yang dibutuhkan: ${missingAttributes.join(', ')}`,
+        missingAttributes
+      });
     }
 
     const TargetModel = getModelByRole(roleName);
@@ -147,7 +166,7 @@ const executeLogin = async (req, res, roleName) => {
 };
 
 // =========================================================================
-// 3. HANDLERS REGISTRASI PER ROLE (Pastikan Phone/PhoneNumber Selalu Terbawa)
+// 3. HANDLERS REGISTRASI PER ROLE
 // =========================================================================
 const registerUser = async (req, res) => {
   const contactNumber = req.body.phone || req.body.phoneNumber || '';
@@ -161,14 +180,18 @@ const registerAdmin = async (req, res) => {
   try {
     const { name, email, password, adminPin, phone, phoneNumber } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "Nama, email, dan password wajib diisi." });
+    // Cek ketersediaan adminPin sebelum mengeksekusi registrasi
+    if (!adminPin || adminPin.trim() === '') {
+      return res.status(400).json({
+        error: "Atribut yang dibutuhkan: adminPin",
+        missingAttributes: ['adminPin']
+      });
     }
 
     const SYSTEM_ADMIN_PIN = process.env.ADMIN_PIN || 'kangkangkubundarahmalagingepel';
 
-    if (!adminPin || adminPin !== SYSTEM_ADMIN_PIN) {
-      return res.status(403).json({ error: "Secret PIN Admin tidak valid atau tidak diisi." });
+    if (adminPin !== SYSTEM_ADMIN_PIN) {
+      return res.status(403).json({ error: "Secret PIN Admin tidak valid." });
     }
 
     // Set nomor telepon ke req.body agar terbaca oleh helper executeRegistration
@@ -211,7 +234,12 @@ const loginTechnician = async (req, res) => executeLogin(req, res, 'TECHNICIAN')
 const verifyAccount = async (req, res) => {
   try {
     const { token } = req.query;
-    if (!token) return res.status(400).json({ error: "Verification token is required." });
+    if (!token) {
+      return res.status(400).json({
+        error: "Atribut yang dibutuhkan: token",
+        missingAttributes: ['token']
+      });
+    }
 
     const roles = [Admin, InfrastructureManager, Technician, User];
     let foundUser = null;
@@ -322,7 +350,10 @@ const editUserBySelf = async (req, res) => {
     const { name, password, phone, phoneNumber, department, specialization } = req.body;
 
     if (!email) {
-      return res.status(400).json({ error: "Email wajib disertakan dalam parameter." });
+      return res.status(400).json({
+        error: "Atribut yang dibutuhkan: email",
+        missingAttributes: ['email']
+      });
     }
 
     const roles = [Admin, InfrastructureManager, Technician, User];
@@ -405,7 +436,10 @@ const deleteUserBySelf = async (req, res) => {
     const { email } = req.params;
 
     if (!email) {
-      return res.status(400).json({ error: "Email wajib disertakan." });
+      return res.status(400).json({
+        error: "Atribut yang dibutuhkan: email",
+        missingAttributes: ['email']
+      });
     }
 
     const roles = [Admin, InfrastructureManager, Technician, User];

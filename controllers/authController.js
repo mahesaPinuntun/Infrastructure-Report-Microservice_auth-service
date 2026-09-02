@@ -51,7 +51,7 @@ const executeRegistration = async (req, res, roleName) => {
       status: roleName === 'ADMIN' ? 'ACTIVE' : 'PENDING',
       verificationToken,
       tokenExpiresAt,
-      // Simpan ke dua field agar kompatibel dengan skema Technician maupun User lain
+      // Simpan ke dua field agar kompatibel dengan seluruh skema model
       phone: contactNumber,
       phoneNumber: contactNumber,
       ...(department && { department }),
@@ -154,7 +154,7 @@ const registerUser = async (req, res) => executeRegistration(req, res, 'USER');
 // Registrasi Admin (Membutuhkan Secret PIN dari .env)
 const registerAdmin = async (req, res) => {
   try {
-    const { name, email, password, adminPin } = req.body;
+    const { name, email, password, adminPin, phone, phoneNumber } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: "Nama, email, dan password wajib diisi." });
@@ -165,6 +165,11 @@ const registerAdmin = async (req, res) => {
     if (!adminPin || adminPin !== SYSTEM_ADMIN_PIN) {
       return res.status(403).json({ error: "Secret PIN Admin tidak valid atau tidak diisi." });
     }
+
+    // Set fallback nomor telepon ke req.body agar terbaca oleh helper executeRegistration
+    const contactNumber = phone || phoneNumber || '';
+    req.body.phone = contactNumber;
+    req.body.phoneNumber = contactNumber;
 
     await executeRegistration(req, res, 'ADMIN');
   } catch (error) {

@@ -7,7 +7,9 @@ const userSchema = new mongoose.Schema({
   passwordHash: { type: String, required: true },
   role: { type: String, default: 'USER' },
   status: { type: String, enum: ['PENDING', 'ACTIVE'], default: 'PENDING' },
-  phoneNumber: String,
+  phone: { type: String, default: '' },
+  phoneNumber: { type: String, default: '' },
+  department: String,
   verificationToken: String,
   tokenExpiresAt: Date,
   createdAt: { type: Date, default: Date.now }
@@ -20,6 +22,8 @@ const adminSchema = new mongoose.Schema({
   passwordHash: { type: String, required: true },
   role: { type: String, default: 'ADMIN' },
   status: { type: String, enum: ['PENDING', 'ACTIVE'], default: 'ACTIVE' },
+  phone: { type: String, default: '' },
+  phoneNumber: { type: String, default: '' },
   verificationToken: String,
   tokenExpiresAt: Date,
   createdAt: { type: Date, default: Date.now }
@@ -33,6 +37,8 @@ const managerSchema = new mongoose.Schema({
   department: String,
   role: { type: String, default: 'INFRASTRUCTURE_MANAGER' },
   status: { type: String, enum: ['PENDING', 'ACTIVE'], default: 'PENDING' },
+  phone: { type: String, default: '' },
+  phoneNumber: { type: String, default: '' },
   verificationToken: String,
   tokenExpiresAt: Date,
   createdAt: { type: Date, default: Date.now }
@@ -46,6 +52,8 @@ const technicianSchema = new mongoose.Schema({
   specialization: String,
   role: { type: String, default: 'TECHNICIAN' },
   status: { type: String, enum: ['PENDING', 'ACTIVE'], default: 'PENDING' },
+  phone: { type: String, default: '' },
+  phoneNumber: { type: String, default: '' },
   verificationToken: String,
   tokenExpiresAt: Date,
   createdAt: { type: Date, default: Date.now }

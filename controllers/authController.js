@@ -16,11 +16,11 @@ const getModelByRole = (role) => {
 };
 
 // =========================================================================
-// 1. HELPER REGISTRASI INTERNAL
+// 1. HELPER REGISTRASI INTERNAL (Dukungan Phone & PhoneNumber Ganda)
 // =========================================================================
 const executeRegistration = async (req, res, roleName) => {
   try {
-    const { name, email, password, phoneNumber, department, specialization } = req.body;
+    const { name, email, password, phone, phoneNumber, department, specialization } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: "Nama, email, dan password wajib diisi." });
@@ -40,6 +40,9 @@ const executeRegistration = async (req, res, roleName) => {
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Jam
 
+    // Ambil nilai nomor HP (bisa dikirim sebagai 'phone' atau 'phoneNumber')
+    const contactNumber = phone || phoneNumber || '';
+
     const newUser = new TargetModel({
       name,
       email,
@@ -48,7 +51,9 @@ const executeRegistration = async (req, res, roleName) => {
       status: roleName === 'ADMIN' ? 'ACTIVE' : 'PENDING',
       verificationToken,
       tokenExpiresAt,
-      ...(phoneNumber && { phoneNumber }),
+      // Simpan ke dua field agar kompatibel dengan skema Technician maupun User lain
+      phone: contactNumber,
+      phoneNumber: contactNumber,
       ...(department && { department }),
       ...(specialization && { specialization })
     });
@@ -70,6 +75,8 @@ const executeRegistration = async (req, res, roleName) => {
         id: newUser._id,
         name: newUser.name,
         email: newUser.email,
+        phone: newUser.phone || newUser.phoneNumber || '',
+        phoneNumber: newUser.phoneNumber || newUser.phone || '',
         role: newUser.role
       }
     });
@@ -126,6 +133,8 @@ const executeLogin = async (req, res, roleName) => {
         id: userDoc._id,
         name: userDoc.name,
         email: userDoc.email,
+        phone: userDoc.phone || userDoc.phoneNumber || '',
+        phoneNumber: userDoc.phoneNumber || userDoc.phone || '',
         role: userRole,
         status: userDoc.status || 'ACTIVE'
       }
@@ -217,7 +226,7 @@ const verifyAccount = async (req, res) => {
 const editUserByAdmin = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { name, role, status, phoneNumber, department, specialization } = req.body;
+    const { name, role, status, phone, phoneNumber, department, specialization } = req.body;
 
     const roles = [Admin, InfrastructureManager, Technician, User];
     let targetUser = null;
@@ -235,6 +244,8 @@ const editUserByAdmin = async (req, res) => {
       return res.status(404).json({ error: "Pengguna tidak ditemukan." });
     }
 
+    const contactNumber = phone || phoneNumber || targetUser.phone || targetUser.phoneNumber;
+
     // Jika role diubah ke model/koleksi lain
     if (role && role.toUpperCase() !== targetUser.role) {
       const newRole = role.toUpperCase();
@@ -246,7 +257,8 @@ const editUserByAdmin = async (req, res) => {
         passwordHash: targetUser.passwordHash,
         role: newRole,
         status: status || targetUser.status,
-        phoneNumber: phoneNumber || targetUser.phoneNumber,
+        phone: contactNumber,
+        phoneNumber: contactNumber,
         department: department || targetUser.department,
         specialization: specialization || targetUser.specialization
       });
@@ -263,7 +275,10 @@ const editUserByAdmin = async (req, res) => {
     // Update standar pada koleksi yang sama
     if (name) targetUser.name = name;
     if (status) targetUser.status = status;
-    if (phoneNumber !== undefined) targetUser.phoneNumber = phoneNumber;
+    if (phone !== undefined || phoneNumber !== undefined) {
+      targetUser.phone = contactNumber;
+      targetUser.phoneNumber = contactNumber;
+    }
     if (department !== undefined) targetUser.department = department;
     if (specialization !== undefined) targetUser.specialization = specialization;
 
@@ -283,7 +298,7 @@ const editUserByAdmin = async (req, res) => {
 const editUserBySelf = async (req, res) => {
   try {
     const { email } = req.params;
-    const { name, password, phoneNumber, department, specialization } = req.body;
+    const { name, password, phone, phoneNumber, department, specialization } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: "Email wajib disertakan dalam parameter." });
@@ -301,8 +316,13 @@ const editUserBySelf = async (req, res) => {
       return res.status(404).json({ error: "Pengguna dengan email tersebut tidak ditemukan." });
     }
 
+    const contactNumber = phone || phoneNumber;
+
     if (name) targetUser.name = name;
-    if (phoneNumber !== undefined) targetUser.phoneNumber = phoneNumber;
+    if (contactNumber !== undefined) {
+      targetUser.phone = contactNumber;
+      targetUser.phoneNumber = contactNumber;
+    }
     if (department !== undefined) targetUser.department = department;
     if (specialization !== undefined) targetUser.specialization = specialization;
 
@@ -319,6 +339,8 @@ const editUserBySelf = async (req, res) => {
         id: targetUser._id,
         name: targetUser.name,
         email: targetUser.email,
+        phone: targetUser.phone || targetUser.phoneNumber || '',
+        phoneNumber: targetUser.phoneNumber || targetUser.phone || '',
         role: targetUser.role
       }
     });

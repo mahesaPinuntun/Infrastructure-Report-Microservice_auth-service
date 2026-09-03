@@ -37,7 +37,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// 2. Body Parser & Helmet Config (Bebas dari hambatan CORS)
+// 2. Body Parser & Helmet Config
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(express.json());
 
@@ -58,7 +58,7 @@ app.use(async (req, res, next) => {
   }
 });
 
-// 5. Rate Limiter (Kapasitas diperlonggar untuk dev & test)
+// 5. Rate Limiter Configuration
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -70,11 +70,11 @@ const authLimiter = rateLimit({
 // ----------------------------------------------------
 // Dedicated Registration Endpoints Per Role
 // ----------------------------------------------------
-// Public: Registrasi Warga / Standard User
+// Public: Registrasi User/Warga Biasa & Admin Baru (menggunakan PIN Admin)
 app.post('/api/auth/register/user', authLimiter, authController.registerUser);
-
-// Protected (Admin Only): Registrasi Admin, Manager, & Technician
 app.post('/api/auth/register/admin', authLimiter, authController.registerAdmin);
+
+// Protected (Admin Only): Registrasi Manager & Technician oleh Admin yang telah Login
 app.post('/api/auth/register/manager', authLimiter, authenticateAdmin, authController.registerManager);
 app.post('/api/auth/register/technician', authLimiter, authenticateAdmin, authController.registerTechnician);
 
@@ -102,7 +102,9 @@ app.delete('/api/auth/users/:userId', authenticateAdmin, authController.deleteUs
 app.put('/api/auth/users/email/:email', authenticateToken, requireSelfOrAdmin, authController.editUserBySelf);
 app.delete('/api/auth/users/email/:email', authenticateToken, requireSelfOrAdmin, authController.deleteUserBySelf);
 
-// Global Error Handler (Menangkap exception agar function tidak crash 500)
+// ----------------------------------------------------
+// Global Error Handler
+// ----------------------------------------------------
 app.use((err, req, res, next) => {
   console.error('[auth-service] Unhandled Error:', err);
   res.status(500).json({ error: err.message || "Internal Server Error" });

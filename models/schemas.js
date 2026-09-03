@@ -35,7 +35,7 @@ const managerSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   passwordHash: { type: String, required: true },
   department: String,
-  role: { type: String, default: 'INFRASTRUCTURE_MANAGER' },
+  role: { type: String, default: 'MANAGER' },
   status: { type: String, enum: ['PENDING', 'ACTIVE'], default: 'PENDING' },
   phone: { type: String, default: '' },
   phoneNumber: { type: String, default: '' },

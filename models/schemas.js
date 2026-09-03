@@ -61,7 +61,7 @@ const technicianSchema = new mongoose.Schema({
 
 const User = mongoose.models.User || mongoose.model('User', userSchema, 'users');
 const Admin = mongoose.models.Admin || mongoose.model('Admin', adminSchema, 'admins');
-const InfrastructureManager = mongoose.models.InfrastructureManager || mongoose.model('InfrastructureManager', managerSchema, 'infrastructure_managers');
+const Manager = mongoose.models.Manager || mongoose.model('Manager', managerSchema, 'managers');
 const Technician = mongoose.models.Technician || mongoose.model('Technician', technicianSchema, 'technicians');
 
 module.exports = {

@@ -16,24 +16,24 @@ const getModelByRole = (role) => {
 };
 
 // =========================================================================
-// 1. HELPER REGISTRASI INTERNAL (Dengan Validasi Presisi Attribute)
+// 1. HELPER REGISTRASI INTERNAL
 // =========================================================================
 const executeRegistration = async (req, res, roleName) => {
   try {
     const { name, email, password, phone, phoneNumber, department, specialization } = req.body;
 
-    // 1. Validasi Atribut Wajib Utama (name, email, password, phone/phoneNumber)
+    // Validasi Atribut Wajib Utama
     const missingAttributes = [];
     if (!name || name.trim() === '') missingAttributes.push('name');
     if (!email || email.trim() === '') missingAttributes.push('email');
     if (!password || password.trim() === '') missingAttributes.push('password');
 
+    // Tangkap nomor telepon dari 'phone' atau 'phoneNumber'
     const contactNumber = (phone || phoneNumber || '').trim();
     if (!contactNumber) {
       missingAttributes.push('phoneNumber');
     }
 
-    // Jika ada atribut wajib yang belum diisi, kembalikan daftar atribut yang dibutuhkan
     if (missingAttributes.length > 0) {
       return res.status(400).json({
         error: `Atribut yang dibutuhkan: ${missingAttributes.join(', ')}`,
@@ -56,18 +56,18 @@ const executeRegistration = async (req, res, roleName) => {
     const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Jam
 
     const newUser = new TargetModel({
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       passwordHash,
       role: roleName,
       status: roleName === 'ADMIN' ? 'ACTIVE' : 'PENDING',
       verificationToken,
       tokenExpiresAt,
-      // Simpan ke dua field agar kompatibel dengan seluruh skema model MongoDB
+      // Simpan ke dua field agar kompatibel dengan seluruh skema Mongoose
       phone: contactNumber,
       phoneNumber: contactNumber,
-      ...(department && { department }),
-      ...(specialization && { specialization })
+      ...(department && { department: department.trim() }),
+      ...(specialization && { specialization: specialization.trim() })
     });
 
     await newUser.save();
@@ -120,7 +120,7 @@ const executeLogin = async (req, res, roleName) => {
     const TargetModel = getModelByRole(roleName);
 
     // Cari user di koleksi spesifiknya
-    const userDoc = await TargetModel.findOne({ email });
+    const userDoc = await TargetModel.findOne({ email: email.trim().toLowerCase() });
     if (!userDoc) {
       return res.status(401).json({ error: "Email atau password salah." });
     }
@@ -169,18 +169,13 @@ const executeLogin = async (req, res, roleName) => {
 // 3. HANDLERS REGISTRASI PER ROLE
 // =========================================================================
 const registerUser = async (req, res) => {
-  const contactNumber = req.body.phone || req.body.phoneNumber || '';
-  req.body.phone = contactNumber;
-  req.body.phoneNumber = contactNumber;
   await executeRegistration(req, res, 'USER');
 };
 
-// Registrasi Admin (Membutuhkan Secret PIN dari .env)
 const registerAdmin = async (req, res) => {
   try {
-    const { name, email, password, adminPin, phone, phoneNumber } = req.body;
+    const { adminPin } = req.body;
 
-    // Cek ketersediaan adminPin sebelum mengeksekusi registrasi
     if (!adminPin || adminPin.trim() === '') {
       return res.status(400).json({
         error: "Atribut yang dibutuhkan: adminPin",
@@ -190,14 +185,9 @@ const registerAdmin = async (req, res) => {
 
     const SYSTEM_ADMIN_PIN = process.env.ADMIN_PIN || 'kangkangkubundarahmalagingepel';
 
-    if (adminPin !== SYSTEM_ADMIN_PIN) {
+    if (adminPin.trim() !== SYSTEM_ADMIN_PIN) {
       return res.status(403).json({ error: "Secret PIN Admin tidak valid." });
     }
-
-    // Set nomor telepon ke req.body agar terbaca oleh helper executeRegistration
-    const contactNumber = phone || phoneNumber || '';
-    req.body.phone = contactNumber;
-    req.body.phoneNumber = contactNumber;
 
     await executeRegistration(req, res, 'ADMIN');
   } catch (error) {
@@ -207,16 +197,10 @@ const registerAdmin = async (req, res) => {
 };
 
 const registerManager = async (req, res) => {
-  const contactNumber = req.body.phone || req.body.phoneNumber || '';
-  req.body.phone = contactNumber;
-  req.body.phoneNumber = contactNumber;
   await executeRegistration(req, res, 'INFRASTRUCTURE_MANAGER');
 };
 
 const registerTechnician = async (req, res) => {
-  const contactNumber = req.body.phone || req.body.phoneNumber || '';
-  req.body.phone = contactNumber;
-  req.body.phoneNumber = contactNumber;
   await executeRegistration(req, res, 'TECHNICIAN');
 };
 
@@ -270,8 +254,6 @@ const verifyAccount = async (req, res) => {
 // =========================================================================
 // 6. EDIT ACCOUNT HANDLERS
 // =========================================================================
-
-// Edit Akun oleh Admin (Berdasarkan ID & Role/TargetModel)
 const editUserByAdmin = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -343,7 +325,6 @@ const editUserByAdmin = async (req, res) => {
   }
 };
 
-// Edit Akun Mandiri oleh Pengguna (Berdasarkan Email)
 const editUserBySelf = async (req, res) => {
   try {
     const { email } = req.params;
@@ -405,8 +386,6 @@ const editUserBySelf = async (req, res) => {
 // =========================================================================
 // 7. DELETE ACCOUNT HANDLERS
 // =========================================================================
-
-// Hapus Akun oleh Admin (Berdasarkan ID)
 const deleteUserByAdmin = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -430,7 +409,6 @@ const deleteUserByAdmin = async (req, res) => {
   }
 };
 
-// Hapus Akun Mandiri oleh Pengguna (Berdasarkan Email)
 const deleteUserBySelf = async (req, res) => {
   try {
     const { email } = req.params;

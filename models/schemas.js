@@ -67,6 +67,6 @@ const Technician = mongoose.models.Technician || mongoose.model('Technician', te
 module.exports = {
   User,
   Admin,
-  InfrastructureManager,
+  Manager,
   Technician
 };

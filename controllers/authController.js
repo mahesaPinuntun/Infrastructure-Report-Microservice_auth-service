@@ -1,14 +1,14 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { Admin, InfrastructureManager, Technician, User } = require('../models/schemas');
+const { Admin, Manager, Technician, User } = require('../models/schemas');
 const sendVerificationEmail = require('../utils/emailer');
 
 // Helper untuk memilih Model Mongoose berdasarkan Role
 const getModelByRole = (role) => {
   switch (role) {
     case 'ADMIN': return Admin;
-    case 'INFRASTRUCTURE_MANAGER': return InfrastructureManager;
+    case 'MANAGER': return Manager;
     case 'TECHNICIAN': return Technician;
     case 'USER': return User;
     default: return User;
@@ -197,7 +197,7 @@ const registerAdmin = async (req, res) => {
 };
 
 const registerManager = async (req, res) => {
-  await executeRegistration(req, res, 'INFRASTRUCTURE_MANAGER');
+  await executeRegistration(req, res, 'MANAGER');
 };
 
 const registerTechnician = async (req, res) => {
@@ -209,7 +209,7 @@ const registerTechnician = async (req, res) => {
 // =========================================================================
 const loginUser = async (req, res) => executeLogin(req, res, 'USER');
 const loginAdmin = async (req, res) => executeLogin(req, res, 'ADMIN');
-const loginManager = async (req, res) => executeLogin(req, res, 'INFRASTRUCTURE_MANAGER');
+const loginManager = async (req, res) => executeLogin(req, res, 'MANAGER');
 const loginTechnician = async (req, res) => executeLogin(req, res, 'TECHNICIAN');
 
 // =========================================================================
@@ -225,7 +225,7 @@ const verifyAccount = async (req, res) => {
       });
     }
 
-    const roles = [Admin, InfrastructureManager, Technician, User];
+    const roles = [Admin, Manager, Technician, User];
     let foundUser = null;
 
     for (const Model of roles) {
@@ -259,7 +259,7 @@ const editUserByAdmin = async (req, res) => {
     const { userId } = req.params;
     const { name, role, status, phone, phoneNumber, department, specialization } = req.body;
 
-    const roles = [Admin, InfrastructureManager, Technician, User];
+    const roles = [Admin, Manager, Technician, User];
     let targetUser = null;
     let CurrentModel = null;
 
@@ -337,7 +337,7 @@ const editUserBySelf = async (req, res) => {
       });
     }
 
-    const roles = [Admin, InfrastructureManager, Technician, User];
+    const roles = [Admin, Manager, Technician, User];
     let targetUser = null;
 
     for (const Model of roles) {
@@ -390,7 +390,7 @@ const deleteUserByAdmin = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const roles = [Admin, InfrastructureManager, Technician, User];
+    const roles = [Admin, Manager, Technician, User];
     let deletedUser = null;
 
     for (const Model of roles) {
@@ -420,7 +420,7 @@ const deleteUserBySelf = async (req, res) => {
       });
     }
 
-    const roles = [Admin, InfrastructureManager, Technician, User];
+    const roles = [Admin, Manager, Technician, User];
     let deletedUser = null;
 
     for (const Model of roles) {

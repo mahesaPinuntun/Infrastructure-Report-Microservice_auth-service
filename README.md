@@ -1,8 +1,8 @@
 # 🔐 Auth Service — Microservice
 
-A dedicated authentication and user management microservice built with **Node.js** and **Express.js**.
+A dedicated authentication and user management microservice built with **Node.js**, **Express.js**, and **MongoDB**.
 
-The service handles user registration, authentication, email account verification, user management, **JWT-based authentication**, and **Role-Based Access Control (RBAC)** for four user roles:
+The service provides user registration, authentication, email account verification, profile management, JWT-based authentication, and role-based access control for four user roles:
 
 * **User / Citizen**
 * **Admin**
@@ -14,7 +14,8 @@ The service handles user registration, authentication, email account verificatio
 ## 📑 Table of Contents
 
 * [🚀 Features](#-features)
-* [🛠️ Prerequisites](#️-prerequisites)
+* [🛠️ Tech Stack](#️-tech-stack)
+* [📋 Prerequisites](#-prerequisites)
 * [📦 Installation](#-installation)
 * [⚙️ Environment Configuration](#️-environment-configuration)
 * [🔌 API Documentation](#-api-documentation)
@@ -24,7 +25,7 @@ The service handles user registration, authentication, email account verificatio
   * [Authentication](#3-authentication)
   * [Account Verification](#4-account-verification)
   * [User Management](#5-user-management)
-* [🛡️ Security & Middleware](#️-security--middleware)
+* [🛡️ Security](#️-security)
 * [▶️ Running the Application](#️-running-the-application)
 * [🌐 Deployment](#-deployment)
 
@@ -32,92 +33,107 @@ The service handles user registration, authentication, email account verificatio
 
 ## 🚀 Features
 
-### 🔐 Authentication & Authorization
+### 🔐 Authentication
 
-* **Dedicated Role Authentication**
+* Dedicated registration endpoints for each user role
+* Dedicated login endpoints for each user role
+* Password hashing using `bcryptjs`
+* JWT-based authentication
+* JWT expiration after **7 days**
+* Email-based account verification
+* Verification tokens with a **24-hour expiration period**
 
-  * Separate registration and login endpoints for each user role.
-  * Supported roles:
+### 👥 User Roles
 
-    * `USER`
-    * `ADMIN`
-    * `MANAGER`
-    * `TECHNICIAN`
+The service supports four roles:
 
-* **JWT Authentication**
+| Role         | Description            |
+| ------------ | ---------------------- |
+| `USER`       | Regular user / citizen |
+| `ADMIN`      | System administrator   |
+| `MANAGER`    | Infrastructure manager |
+| `TECHNICIAN` | Field technician       |
 
-  * Secure token-based authentication using JSON Web Tokens.
-  * Protected endpoints require a valid Bearer token.
-
-* **Role-Based Access Control (RBAC)**
-
-  * Restricts access to resources based on the authenticated user's role.
-  * Admin-only operations are protected through dedicated middleware.
+Each role is stored in its own MongoDB model/collection.
 
 ### 👤 User Management
 
-* User / Citizen registration
-* Admin registration with an additional Admin PIN
-* Manager account creation by Admin
-* Technician account creation by Admin
-* User profile management
-* Admin user management
-* User account deletion
-* Account verification through email verification tokens
+* Register new users
+* Register administrators using a secret Admin PIN
+* Admin-controlled Manager registration
+* Admin-controlled Technician registration
+* Update user information
+* Update user profiles
+* Change user roles
+* Change account status
+* Delete user accounts
+* Update passwords
+* Manage phone numbers
+* Manage role-specific information such as department and specialization
 
 ### 🛡️ Security
 
-* JWT-based authentication
-* Password authentication
+* Password hashing with `bcryptjs`
+* JWT authentication
 * Role-based authorization
 * Authentication rate limiting
-* HTTP security headers using `helmet`
-* Controlled CORS configuration
-* CORS preflight (`OPTIONS`) handling
-* Self-or-Admin authorization middleware
-
-### ⚡ Deployment
-
-* Supports standard local Node.js environments
-* Can be deployed as a serverless application
-* Compatible with platforms such as **Vercel**
+* HTTP security headers using Helmet
+* CORS configuration
+* Email verification tokens
+* Self-or-Admin authorization
 
 ---
 
-## 🛠️ Prerequisites
+# 🛠️ Tech Stack
 
-Before running the service, make sure the following are installed:
+| Technology       | Purpose                              |
+| ---------------- | ------------------------------------ |
+| **Node.js**      | JavaScript runtime                   |
+| **Express.js**   | REST API framework                   |
+| **MongoDB**      | Database                             |
+| **Mongoose**     | MongoDB ODM                          |
+| **bcryptjs**     | Password hashing                     |
+| **jsonwebtoken** | JWT authentication                   |
+| **crypto**       | Secure verification token generation |
+| **Helmet**       | HTTP security headers                |
+| **CORS**         | Cross-origin request handling        |
+
+---
+
+# 📋 Prerequisites
+
+Before running the service, make sure you have:
 
 ### Node.js
 
-**Node.js 16 or newer**
+Node.js **16 or newer**.
 
 ### MongoDB
 
 A MongoDB database is required.
 
-You can use either:
+Supported configurations include:
 
 * Local MongoDB
 * MongoDB Atlas
 
 ---
 
-## 📦 Installation
+# 📦 Installation
 
-### 1. Clone the repository
+## 1. Clone the repository
 
 ```bash
 git clone <your-repository-url>
 ```
 
-### 2. Enter the project directory
+## 2. Enter the project directory
 
 ```bash
 cd auth-service
 ```
 
-### 3. Install dependencies
+## 3. Install dependencies
 
 ```bash
 npm install
@@ -125,7 +141,7 @@ npm install
 
 ---
 
-## ⚙️ Environment Configuration
+# ⚙️ Environment Configuration
 
 Create a `.env` file in the root directory:
 
@@ -136,22 +152,22 @@ NODE_ENV=development
 MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/auth_db
 
 JWT_SECRET=your_secure_jwt_secret
-ADMIN_SECRET_PIN=your_admin_registration_pin
+ADMIN_PIN=your_admin_registration_pin
 ```
 
-### Environment Variables
+## Environment Variables
 
-| Variable           | Description                                       | Example                       |
-| ------------------ | ------------------------------------------------- | ----------------------------- |
-| `PORT`             | Port used by the application in local development | `8001`                        |
-| `NODE_ENV`         | Application environment                           | `development`                 |
-| `MONGO_URI`        | MongoDB connection string                         | `mongodb+srv://...`           |
-| `JWT_SECRET`       | Secret key used to sign JWT tokens                | `your_secure_jwt_secret`      |
-| `ADMIN_SECRET_PIN` | Secret PIN required for Admin registration        | `your_admin_registration_pin` |
+| Variable     | Description                                | Example                       |
+| ------------ | ------------------------------------------ | ----------------------------- |
+| `PORT`       | Port used by the application               | `8001`                        |
+| `NODE_ENV`   | Application environment                    | `development`                 |
+| `MONGO_URI`  | MongoDB connection string                  | `mongodb+srv://...`           |
+| `JWT_SECRET` | Secret used to sign JWT tokens             | `your_secure_jwt_secret`      |
+| `ADMIN_PIN`  | Secret PIN required for Admin registration | `your_admin_registration_pin` |
 
-> ⚠️ **Security:** Never commit your actual `.env` file, JWT secret, MongoDB credentials, or Admin PIN to a public repository.
+> ⚠️ **Security:** Never commit your `.env` file, MongoDB credentials, JWT secret, or Admin PIN to a public repository.
 
-Add `.env` to `.gitignore`:
+Add the following to `.gitignore`:
 
 ```gitignore
 .env
@@ -174,26 +190,18 @@ http://localhost:8001
 | `GET`    | `/`                             | Public             | No         | Basic service status                |
 | `GET`    | `/api/auth/health`              | Public             | No         | Authentication service health check |
 | `POST`   | `/api/auth/register/user`       | Public             | Yes        | Register a User / Citizen           |
-| `POST`   | `/api/auth/register/admin`      | Public + Admin PIN | Yes        | Register a new Admin                |
+| `POST`   | `/api/auth/register/admin`      | Public + Admin PIN | Yes        | Register an Admin                   |
 | `POST`   | `/api/auth/register/manager`    | Admin              | Yes        | Register a Manager                  |
 | `POST`   | `/api/auth/register/technician` | Admin              | Yes        | Register a Technician               |
-| `POST`   | `/api/auth/login/user`          | Public             | Yes        | Authenticate a User / Citizen       |
-| `POST`   | `/api/auth/login/admin`         | Public             | Yes        | Authenticate an Admin               |
-| `POST`   | `/api/auth/login/manager`       | Public             | Yes        | Authenticate a Manager              |
-| `POST`   | `/api/auth/login/technician`    | Public             | Yes        | Authenticate a Technician           |
-| `GET`    | `/api/auth/verify`              | Public             | No         | Verify a user account               |
+| `POST`   | `/api/auth/login/user`          | Public             | Yes        | Login as User / Citizen             |
+| `POST`   | `/api/auth/login/admin`         | Public             | Yes        | Login as Admin                      |
+| `POST`   | `/api/auth/login/manager`       | Public             | Yes        | Login as Manager                    |
+| `POST`   | `/api/auth/login/technician`    | Public             | Yes        | Login as Technician                 |
+| `GET`    | `/api/auth/verify`              | Public             | No         | Verify an account                   |
 | `PUT`    | `/api/auth/users/:userId`       | Admin              | No         | Update a user by ID                 |
 | `DELETE` | `/api/auth/users/:userId`       | Admin              | No         | Delete a user by ID                 |
-| `PUT`    | `/api/auth/users/email/:email`  | Self / Admin       | No         | Update a user profile by email      |
-| `DELETE` | `/api/auth/users/email/:email`  | Self / Admin       | No         | Delete a user account by email      |
-
-### Rate Limit
-
-Authentication-related endpoints are protected by a rate limiter:
-
-```text
-100 requests per 15 minutes per IP address
-```
+| `PUT`    | `/api/auth/users/email/:email`  | Self / Admin       | No         | Update a user profile               |
+| `DELETE` | `/api/auth/users/email/:email`  | Self / Admin       | No         | Delete a user account               |
 
 ---
 
@@ -215,9 +223,18 @@ Returns the health status of the authentication service.
 
 ---
 
-## 2. Registration
+# 2. Registration
 
-### Register User / Citizen
+All registration requests require the following basic information:
+
+* `name`
+* `email`
+* `password`
+* `phone` or `phoneNumber`
+
+## The service normalizes email addresses to lowercase and stores the contact number in both `phone` and `phoneNumber` fields for schema compatibility.
+
+## Register User / Citizen
 
 ```http
 POST /api/auth/register/user
@@ -225,19 +242,20 @@ POST /api/auth/register/user
 
 **Access:** Public
 
-#### Request Body
+### Request Body
 
 ```json
 {
   "name": "Example Citizen",
   "email": "user@example.com",
-  "password": "Password123"
+  "password": "Password123",
+  "phoneNumber": "081234567890"
 }
 ```
 
 ---
 
-### Register Admin
+## Register Admin
 
 ```http
 POST /api/auth/register/admin
@@ -245,22 +263,25 @@ POST /api/auth/register/admin
 
 **Access:** Public + Admin PIN
 
-An Admin registration requires the configured `ADMIN_SECRET_PIN`.
+Admin registration requires the `ADMIN_PIN` environment variable value.
 
-#### Request Body
+### Request Body
 
 ```json
 {
   "name": "System Administrator",
   "email": "admin@example.com",
   "password": "Password123",
-  "adminPin": "SECRET_PIN"
+  "phoneNumber": "081234567890",
+  "adminPin": "YOUR_ADMIN_PIN"
 }
 ```
 
+The Admin PIN is checked against `process.env.ADMIN_PIN`.
+
 ---
 
-### Register Manager
+## Register Manager
 
 ```http
 POST /api/auth/register/manager
@@ -274,19 +295,21 @@ Requires an Admin JWT:
 Authorization: Bearer <ADMIN_JWT_TOKEN>
 ```
 
-#### Request Body
+### Request Body
 
 ```json
 {
   "name": "Infrastructure Manager",
   "email": "manager@example.com",
-  "password": "Password123"
+  "password": "Password123",
+  "phoneNumber": "081234567890",
+  "department": "Infrastructure"
 }
 ```
 
 ---
 
-### Register Technician
+## Register Technician
 
 ```http
 POST /api/auth/register/technician
@@ -300,21 +323,23 @@ Requires an Admin JWT:
 Authorization: Bearer <ADMIN_JWT_TOKEN>
 ```
 
-#### Request Body
+### Request Body
 
 ```json
 {
   "name": "Field Technician",
   "email": "technician@example.com",
-  "password": "Password123"
+  "password": "Password123",
+  "phoneNumber": "081234567890",
+  "specialization": "Electrical Infrastructure"
 }
 ```
 
----
+## The registration handler supports optional `department` and `specialization` fields.
 
 # 3. Authentication
 
-The service provides dedicated login endpoints for each supported role.
+The service provides dedicated login endpoints for each role.
 
 ### Login Endpoints
 
@@ -329,8 +354,6 @@ POST /api/auth/login/technician
 
 ### Request Body
 
-The request format is the same for all login endpoints:
-
 ```json
 {
   "email": "user@example.com",
@@ -340,22 +363,43 @@ The request format is the same for all login endpoints:
 
 ### Successful Response
 
-**HTTP 200 OK**
-
 ```json
 {
-  "message": "Login successful",
+  "message": "Login berhasil",
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
     "id": "60d5ec49f1a2c80015f8e9a1",
     "name": "Example User",
     "email": "user@example.com",
-    "role": "USER"
+    "phone": "081234567890",
+    "phoneNumber": "081234567890",
+    "role": "USER",
+    "status": "ACTIVE"
   }
 }
 ```
 
-The returned JWT can then be used to access protected endpoints:
+The login process:
+
+1. Finds the user in the collection associated with the requested role.
+2. Compares the submitted password with the stored password hash.
+3. Generates a JWT.
+4. Returns the authenticated user's information.
+
+The JWT contains:
+
+```json
+{
+  "id": "USER_ID",
+  "email": "user@example.com",
+  "name": "Example User",
+  "role": "USER"
+}
+```
+
+The token is configured to expire after **7 days**.
+
+Use the returned token for protected endpoints:
 
 ```http
 Authorization: Bearer <JWT_TOKEN>
@@ -365,15 +409,11 @@ Authorization: Bearer <JWT_TOKEN>
 
 # 4. Account Verification
 
-### Verify Account
-
-```http
-GET /api/auth/verify
-```
+## `GET /api/auth/verify`
 
 **Access:** Public
 
-Account verification is performed using a verification token sent to the user's email address.
+Account verification is performed using a verification token sent through email.
 
 ### Query Parameter
 
@@ -387,7 +427,20 @@ Account verification is performed using a verification token sent to the user's 
 GET /api/auth/verify?token=abc123
 ```
 
-The endpoint validates the verification token and activates the corresponding user account.
+During registration, the service generates a cryptographically secure verification token and sets its expiration to **24 hours**.
+
+The verification process searches across all supported role collections:
+
+* Admin
+* Manager
+* Technician
+* User
+
+If a valid token is found:
+
+* The account status is changed to `ACTIVE`
+* The verification token is removed
+* The token expiration value is removed
 
 ---
 
@@ -407,13 +460,22 @@ PUT /api/auth/users/:userId
 userId
 ```
 
-The `userId` corresponds to the user's MongoDB identifier.
-
-Requires an Admin JWT:
+Requires:
 
 ```http
 Authorization: Bearer <ADMIN_JWT_TOKEN>
 ```
+
+The Admin can update:
+
+* Name
+* Role
+* Status
+* Phone number
+* Department
+* Specialization
+
+If the Admin changes the user's role, the service creates the user in the new role's collection and removes the original document from the previous collection.
 
 ---
 
@@ -425,21 +487,17 @@ DELETE /api/auth/users/:userId
 
 **Access:** Admin only
 
-### URL Parameter
-
-```text
-userId
-```
-
-Requires an Admin JWT:
+Requires:
 
 ```http
 Authorization: Bearer <ADMIN_JWT_TOKEN>
 ```
 
+The service searches the supported role collections and deletes the matching user.
+
 ---
 
-## Update User Profile by Email
+## Update User Profile
 
 ```http
 PUT /api/auth/users/email/:email
@@ -447,26 +505,31 @@ PUT /api/auth/users/email/:email
 
 **Access:** Account owner or Admin
 
-The `requireSelfOrAdmin` middleware ensures that:
-
-* A user can modify their own account.
-* An Admin can modify another user's account.
-
 ### URL Parameter
 
 ```text
 email
 ```
 
-Requires authentication:
+Requires:
 
 ```http
 Authorization: Bearer <JWT_TOKEN>
 ```
 
+Supported profile fields include:
+
+* Name
+* Password
+* Phone number
+* Department
+* Specialization
+
+If a new password is supplied, it is hashed with `bcryptjs` before being stored.
+
 ---
 
-## Delete User Account by Email
+## Delete User Account
 
 ```http
 DELETE /api/auth/users/email/:email
@@ -474,10 +537,11 @@ DELETE /api/auth/users/email/:email
 
 **Access:** Account owner or Admin
 
-The `requireSelfOrAdmin` middleware ensures that:
+Requires:
 
-* A user can delete their own account.
-* An Admin can delete another user's account.
+```http
+Authorization: Bearer <JWT_TOKEN>
+```
 
 ### URL Parameter
 
@@ -485,103 +549,119 @@ The `requireSelfOrAdmin` middleware ensures that:
 email
 ```
 
-Requires authentication:
+The service searches the supported role collections and removes the matching account.
+
+---
+
+# 🛡️ Security
+
+## Password Hashing
+
+Passwords are never stored directly.
+
+The service uses `bcryptjs` to generate a salt and hash passwords before storing them in MongoDB.
+
+During login, the submitted password is compared against the stored `passwordHash`.
+
+---
+
+## JWT Authentication
+
+Authenticated requests use the Bearer token format:
 
 ```http
 Authorization: Bearer <JWT_TOKEN>
 ```
 
+JWT payloads contain:
+
+* User ID
+* Email
+* Name
+* Role
+
+The token expires after seven days.
+
 ---
 
-# 🛡️ Security & Middleware
+## Role-Based Access Control
 
-## CORS
-
-Cross-Origin Resource Sharing is configured to control which applications can communicate with the authentication service.
-
-Configured origins include:
+The service separates users into four roles:
 
 ```text
-https://infrastructure-report-microservice-admin-manager.vercel.app
-
-http://localhost:3000
-
-http://localhost:5173
-
-http://localhost:8080
+USER
+ADMIN
+MANAGER
+TECHNICIAN
 ```
 
-CORS preflight `OPTIONS` requests are also handled by the application.
+Administrative operations require an Admin account, while self-service operations can be performed by the account owner.
 
 ---
 
-## Helmet
+## Account Verification
 
-The service uses `helmet` to add security-related HTTP headers and reduce exposure to common web security risks.
+New accounts receive a cryptographically generated verification token.
 
-Example configuration:
+Verification tokens:
 
-```javascript
-helmet({
-  crossOriginResourcePolicy: false
-})
+```text
+Random token
+        │
+        ▼
+Stored in MongoDB
+        │
+        ├── Valid for 24 hours
+        │
+        ▼
+Verification email
+        │
+        ▼
+GET /api/auth/verify?token=...
+        │
+        ▼
+Account → ACTIVE
 ```
 
 ---
 
 ## Rate Limiting
 
-Authentication endpoints use a rate limiter to reduce the risk of:
+Authentication endpoints should be protected by the configured rate limiter to reduce:
 
 * Brute-force login attempts
 * Excessive authentication requests
 * Automated abuse
 
-Current configuration:
+The documented configuration is:
 
 ```text
-100 requests / 15 minutes / IP
+100 requests / 15 minutes / IP address
 ```
 
-> Note: Rate limiting provides an additional abuse-control layer; it should not be considered a complete DDoS protection mechanism.
+> Rate limiting is an additional abuse-prevention mechanism and should not be considered complete DDoS protection.
 
 ---
 
-## Authentication Middleware
+## CORS
 
-### `authenticateToken`
+The service can be configured to allow requests from trusted frontend applications.
 
-Validates the JWT provided in the request:
+Example development origins:
 
-```http
-Authorization: Bearer <JWT_TOKEN>
+```text
+http://localhost:3000
+http://localhost:5173
+http://localhost:8080
 ```
 
-Used to protect authenticated resources.
+Production frontend origins should be explicitly configured according to the deployed application.
 
 ---
 
-### `authenticateAdmin`
+## Helmet
 
-Validates the JWT and ensures that the authenticated account has the `ADMIN` role.
-
-Used for administrative operations such as:
-
-* Creating Managers
-* Creating Technicians
-* Updating users
-* Deleting users
-
----
-
-### `requireSelfOrAdmin`
-
-Ensures that the authenticated user is either:
-
-1. The owner of the requested account, or
-2. An Admin
-
-This middleware is used for profile management and account deletion.
+The application uses **Helmet** to provide security-related HTTP headers and reduce exposure to common web security risks.
 
 ---
 
@@ -589,19 +669,19 @@ This middleware is used for profile management and account deletion.
 
 ## Development
 
-Run the application using `nodemon`:
+Run using `nodemon`:
 
 ```bash
 npm run dev
 ```
 
-Or start the server directly:
+Or run directly with Node.js:
 
 ```bash
 node server.js
 ```
 
-The application will be available at:
+The service runs on:
 
 ```text
 http://localhost:8001
@@ -611,71 +691,116 @@ http://localhost:8001
 
 ## Production
 
-For production environments:
+Run:
 
 ```bash
 npm start
 ```
 
-The application is designed to support serverless deployment by exporting the Express application as a handler when running in a serverless environment.
-
-This allows the service to be deployed on platforms such as:
-
-* Vercel
-* Other Node.js-compatible hosting platforms
+The application can also be configured for serverless deployment.
 
 ---
 
 # 🌐 Deployment
 
-The service can operate in two environments:
+The service can be deployed in a traditional Node.js environment or a serverless environment.
 
-### Local Server
-
-```text
-Client
-   │
-   ▼
-Express.js
-   │
-   ▼
-Auth Service
-   │
-   ▼
-MongoDB
-```
-
-### Serverless
+### Local Architecture
 
 ```text
-Client
-   │
-   ▼
-Vercel
-   │
-   ▼
-Express.js Auth Service
-   │
-   ▼
-MongoDB Atlas
+┌──────────────┐
+│    Client    │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────────┐
+│  Express.js API  │
+│   Auth Service   │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│     MongoDB      │
+└──────────────────┘
 ```
 
-For production deployments, make sure sensitive environment variables are configured through the hosting provider rather than committed to the repository.
+### Serverless Architecture
+
+```text
+┌──────────────┐
+│    Client    │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────────┐
+│ Serverless Host  │
+│     Vercel       │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  Express.js Auth │
+│     Service      │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│   MongoDB Atlas  │
+└──────────────────┘
+```
 
 ---
 
-## 📌 Technology Stack
+# 📁 Supported User Data
 
-| Technology       | Purpose                         |
-| ---------------- | ------------------------------- |
-| **Node.js**      | JavaScript runtime              |
-| **Express.js**   | REST API framework              |
-| **MongoDB**      | User data storage               |
-| **JWT**          | Authentication tokens           |
-| **Helmet**       | HTTP security headers           |
-| **CORS**         | Cross-origin request management |
-| **Rate Limiter** | Authentication abuse protection |
-| **Vercel**       | Serverless deployment           |
+The authentication service supports common user information:
+
+```text
+name
+email
+passwordHash
+phone
+phoneNumber
+role
+status
+verificationToken
+tokenExpiresAt
+department
+specialization
+```
+
+Role-specific fields such as `department` and `specialization` can be supplied where applicable.
+
+---
+
+# 📌 Project Summary
+
+This Auth Service provides a centralized authentication layer for applications that require multiple user roles and controlled access.
+
+### Core capabilities
+
+```text
+Registration
+     │
+     ▼
+Email Verification
+     │
+     ▼
+Authentication
+     │
+     ▼
+JWT Token
+     │
+     ▼
+Role-Based Access
+     │
+     ├── USER
+     ├── ADMIN
+     ├── MANAGER
+     └── TECHNICIAN
+```
+
+It is designed to function as an independent authentication microservice that can be consumed by multiple frontend or backend services.
 
 ---
 
@@ -683,4 +808,4 @@ For production deployments, make sure sensitive environment variables are config
 
 This project is intended for educational and development purposes.
 
-Add your preferred license here if the repository will be distributed publicly.
+Add a license such as **MIT**, **Apache-2.0**, or another appropriate license if you plan to distribute the repository publicly.
